@@ -4,6 +4,7 @@ import { authenticateToken } from '../middleware/authMiddleware.js';
 import roomRoutes from './roomRoutes.js';
 import tenantRoutes from './tenantRoutes.js';
 import occupancyRoutes from './occupancyRoutes.js';
+import billRoutes from './billRoutes.js';
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -12,6 +13,7 @@ const prisma = new PrismaClient();
 router.use('/:propertyId/rooms', roomRoutes);
 router.use('/:propertyId/tenants', tenantRoutes);
 router.use('/:propertyId/occupancies', occupancyRoutes);
+router.use('/:propertyId/bills', billRoutes);
 
 // Semua route property memerlukan otentikasi JWT
 router.use(authenticateToken);
