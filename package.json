@@ -1,0 +1,12 @@
+{
+  "name": "kost-manager-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev:frontend": "cd frontend && npm run dev",
+    "dev:server": "cd server && npm run dev",
+    "db:migrate": "cd server && npx prisma migrate dev",
+    "db:seed": "cd server && npx prisma db seed",
+    "db:studio": "cd server && npx prisma studio"
+  }
+}

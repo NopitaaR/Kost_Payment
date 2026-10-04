@@ -1,0 +1,148 @@
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum RoomStatus {
+  KOSONG
+  TERISI
+}
+
+enum TenantStatus {
+  AKTIF
+  KELUAR
+}
+
+enum OccupancyStatus {
+  AKTIF
+  PINDAH
+  KELUAR
+}
+
+enum BillStatus {
+  BELUM_BAYAR
+  SEBAGIAN
+  LUNAS
+  TERLAMBAT
+}
+
+enum PaymentMethod {
+  CASH
+  TRANSFER
+}
+
+model User {
+  id           String     @id @default(uuid())
+  name         String
+  email        String     @unique
+  phone        String?
+  passwordHash String
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  properties   Property[]
+}
+
+model Property {
+  id          String      @id @default(uuid())
+  userId      String?
+  name        String
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  user        User?       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  rooms       Room[]
+  occupancies Occupancy[]
+  bills       Bill[]
+  settings    Setting[]
+}
+
+model Room {
+  id          String      @id @default(uuid())
+  propertyId  String
+  roomNumber  String
+  price       Int
+  status      RoomStatus  @default(KOSONG)
+  notes       String?     @db.Text
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  property    Property    @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  occupancies Occupancy[]
+  bills       Bill[]
+
+  @@unique([propertyId, roomNumber])
+}
+
+model Tenant {
+  id            String       @id @default(uuid())
+  name          String
+  phone         String
+  ktpPhoto      String?
+  originAddress String       @db.Text
+  occupation    String
+  status        TenantStatus @default(AKTIF)
+  notes         String?      @db.Text
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  occupancies   Occupancy[]
+}
+
+model Occupancy {
+  id         String          @id @default(uuid())
+  tenantId   String
+  propertyId String
+  roomId     String
+  startDate  DateTime
+  endDate    DateTime?
+  status     OccupancyStatus @default(AKTIF)
+  notes      String?         @db.Text
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
+  tenant     Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  property   Property        @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  room       Room            @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  bills      Bill[]
+}
+
+model Bill {
+  id          String     @id @default(uuid())
+  propertyId  String
+  roomId      String
+  occupancyId String?
+  periodStart DateTime
+  periodEnd   DateTime
+  amount      Int
+  dueDate     DateTime
+  status      BillStatus @default(BELUM_BAYAR)
+  notes       String?    @db.Text
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  property    Property   @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  room        Room       @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  occupancy   Occupancy? @relation(fields: [occupancyId], references: [id], onDelete: SetNull)
+  payments    Payment[]
+}
+
+model Payment {
+  id          String        @id @default(uuid())
+  billId      String
+  paymentDate DateTime
+  amount      Int
+  method      PaymentMethod
+  notes       String?       @db.Text
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  bill        Bill          @relation(fields: [billId], references: [id], onDelete: Cascade)
+}
+
+model Setting {
+  id           String   @id @default(uuid())
+  propertyId   String
+  settingKey   String
+  settingValue String   @db.Text
+  property     Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@unique([propertyId, settingKey])
+}

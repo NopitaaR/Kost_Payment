@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="id"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Kost Manager — Desain UI/UX</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#f2fbf8;--card:#fff;--ink:#12261f;--mute:#58716a;--line:#d3ece4;--brand:#3fcfa4;--brandd:#0b7a5c;--onb:#053b2c;--bs:#dff7ee;--ok:#15803d;--oks:#dcf3e3;--warn:#b45309;--warns:#fdf0d4;--bad:#c81e1e;--bads:#fde4e4;--gray:#5b6670;--grays:#e8f1ee;color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+*{box-sizing:border-box}html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:15px/1.45 'Plus Jakarta Sans',system-ui,-apple-system,'Segoe UI',sans-serif;-webkit-tap-highlight-color:transparent}
+button,input,select,textarea{font:inherit;color:inherit}
+#app{max-width:480px;margin:0 auto;min-height:100vh;padding-bottom:96px}
+.proto{display:flex;gap:6px;align-items:center;padding:8px 14px;font-size:12px;color:var(--mute);overflow-x:auto;white-space:nowrap}
+.proto button{border:1px solid var(--line);background:var(--card);border-radius:99px;padding:4px 10px;font-size:12px;cursor:pointer}
+.proto button.on{background:var(--brand);color:var(--onb);border-color:var(--brand)}
+.pad{padding:0 18px}
+.hd{display:flex;align-items:center;gap:8px;padding:10px 12px 6px;position:sticky;top:env(safe-area-inset-top,0px);background:var(--bg);z-index:5}
+.hd h1{font-size:20px;font-weight:800;margin:0;flex:1;letter-spacing:-.01em}
+.ib{width:42px;height:42px;border:0;background:transparent;border-radius:12px;font-size:20px;cursor:pointer}
+.ib:active{background:var(--grays)}
+h2{font-size:13px;font-weight:700;color:var(--mute);margin:22px 0 8px}
+h3{font-size:18px;margin:0 0 6px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px 16px;margin-bottom:10px;display:block;width:100%;text-align:left;cursor:pointer}
+.card.flat{cursor:default}
+.row{display:flex;gap:10px;align-items:center}.sp{justify-content:space-between}.row>*{flex:1}.row>.fit{flex:0 0 auto}
+.mute{color:var(--mute)}.sm{font-size:13px}.b{font-weight:700}.big{font-size:30px;font-weight:800;letter-spacing:-.02em;line-height:1.1}
+.bd{display:inline-block;font-size:12px;font-weight:700;padding:3px 10px;border-radius:99px;white-space:nowrap}
+.bd.ok{background:var(--oks);color:var(--ok)}.bd.warn{background:var(--warns);color:var(--warn)}.bd.bad{background:var(--bads);color:var(--bad)}.bd.gray{background:var(--grays);color:var(--gray)}.bd.brand{background:var(--bs);color:var(--brandd);border:1px solid #b5ecd9}
+.btn{display:block;width:100%;border:0;border-radius:14px;padding:14px;font-weight:700;background:var(--brand);color:var(--onb);cursor:pointer;margin-top:10px;text-align:center}
+.btn.ghost{background:var(--card);color:var(--ink);border:1px solid var(--line)}.btn.bad{background:var(--bad);color:#fff}.btn.sm{padding:10px;font-size:14px;margin-top:0}
+.btn.wa{background:var(--oks);color:var(--ok)}
+.lbl{display:block;font-size:13px;font-weight:600;margin:14px 0 6px}
+input,select,textarea{width:100%;border:1px solid var(--line);background:var(--card);border-radius:12px;padding:12px 14px;outline:0}
+input:focus,select:focus,textarea:focus,.btn:focus-visible,.ib:focus-visible,.card:focus-visible{outline:2px solid var(--brand);outline-offset:1px}
+.err{color:var(--bad);font-size:13px;margin-top:6px}
+.chips{display:flex;gap:8px;margin:10px 0}.chip{border:1px solid var(--line);background:var(--card);border-radius:99px;padding:7px 14px;font-weight:600;font-size:14px;cursor:pointer}.chip.on{background:var(--brand);color:var(--onb);border-color:var(--brand)}
+.av{width:40px;height:40px;border-radius:50%;background:var(--bs);color:var(--brandd);display:grid;place-items:center;font-weight:800;flex:0 0 40px}
+.av.lg{width:72px;height:72px;font-size:28px;flex-basis:72px;margin:0 auto 10px}
+.kv{display:flex;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid var(--line)}.kv:last-child{border:0}.kv span:first-child{color:var(--mute)}.kv span:last-child{font-weight:600;text-align:right}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.grid .card{margin:0}
+.fab{position:fixed;right:max(18px,calc(50% - 222px));bottom:92px;background:var(--brand);color:var(--onb);border:0;border-radius:99px;padding:14px 20px;font-weight:700;box-shadow:0 6px 18px rgba(10,125,92,.28);cursor:pointer;z-index:6}
+nav.bn{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:480px;display:flex;background:var(--card);border-top:1px solid var(--line);padding:6px 4px calc(6px + env(safe-area-inset-bottom,0px));z-index:7}
+nav.bn button{flex:1;border:0;background:none;display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 0;font-size:11px;font-weight:600;color:var(--mute);cursor:pointer;border-radius:12px}
+nav.bn button i{font-style:normal;font-size:20px}nav.bn button.on{color:var(--brandd)}
+.ov{position:fixed;inset:0;background:rgba(10,14,25,.5);display:flex;align-items:flex-end;justify-content:center;z-index:20}
+.sh{background:var(--card);width:100%;max-width:480px;border-radius:22px 22px 0 0;padding:22px 18px calc(22px + env(safe-area-inset-bottom,0px));animation:up .2s ease-out}
+@keyframes up{from{transform:translateY(30px);opacity:.4}}
+@media(prefers-reduced-motion:reduce){.sh{animation:none}}
+#toast{position:fixed;left:50%;bottom:100px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 18px;border-radius:99px;font-weight:600;font-size:14px;z-index:30;display:none;max-width:90%}
+.skel{height:92px;border-radius:16px;background:linear-gradient(90deg,var(--grays),var(--line),var(--grays));background-size:200% 100%;animation:sk 1.2s linear infinite;margin-bottom:10px}
+@keyframes sk{to{background-position:-200% 0}}
+.empty{text-align:center;padding:48px 20px}.empty .em{font-size:44px}.empty p{color:var(--mute);margin:6px 0 4px}
+.upl{display:block;border:2px dashed var(--line);border-radius:16px;padding:26px;text-align:center;color:var(--mute);cursor:pointer;font-weight:600}.upl.done{border-color:var(--ok);color:var(--ok);border-style:solid}
+.steps{display:flex;gap:6px;margin:6px 0 4px}.steps i{flex:1;height:4px;border-radius:4px;background:var(--line)}.steps i.on{background:var(--brand)}
+.seg{display:flex;gap:8px}.seg label{flex:1;margin:0}.seg input{display:none}.seg span{display:block;text-align:center;border:1px solid var(--line);border-radius:12px;padding:12px;font-weight:600;cursor:pointer;background:var(--card)}.seg input:checked+span{background:var(--bs);border-color:var(--brand);color:var(--brandd)}
+@media(min-width:900px){
+ #app{max-width:none;padding:0 0 40px 230px}.wrap{max-width:640px;margin:0 auto}
+ nav.bn{left:0;top:0;bottom:0;transform:none;width:230px;max-width:none;flex-direction:column;justify-content:flex-start;gap:4px;padding:28px 12px;border-top:0;border-right:1px solid var(--line)}
+ nav.bn button{flex:0;flex-direction:row;gap:12px;font-size:15px;padding:12px 14px}
+ .fab{right:40px;bottom:40px}.hd{padding-top:20px}
+}
+</style></head><body>
+<div id="app"></div><div id="ov"></div><div id="toast"></div>
+<script>
+const TODAY=new Date('2026-10-04');
+const $=s=>document.querySelector(s);
+const rp=n=>'Rp'+n.toLocaleString('id-ID');
+const fd=i=>new Date(i).toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'numeric'});
+let R=[{n:'01',p:800000,note:''},{n:'02',p:700000,note:''},{n:'03',p:1000000,note:'Ada kamar mandi dalam'},{n:'04',p:700000,note:''},{n:'05',p:750000,note:''}];
+let T=[
+{id:1,name:'Andi',room:'01',hp:'0812-3456-7801',addr:'Binjai',job:'Karyawan',in:'2026-01-20',st:'Aktif'},
+{id:2,name:'Budi Santoso',room:'01',hp:'0813-9988-2210',addr:'Medan',job:'Mahasiswa',in:'2026-01-20',st:'Aktif'},
+{id:3,name:'Sari',room:'03',hp:'0821-7000-1122',addr:'Pematangsiantar',job:'Perawat',in:'2026-08-25',st:'Aktif'},
+{id:4,name:'Dewi',room:'04',hp:'0857-1200-3344',addr:'Tebing Tinggi',job:'Guru',in:'2026-09-28',st:'Aktif'},
+{id:5,name:'Rina',room:'05',hp:'0852-6677-8899',addr:'Kisaran',job:'Mahasiswa',in:'2026-05-01',st:'Aktif'},
+{id:6,name:'Joko',room:'02',hp:'0811-2233-4455',addr:'Lubuk Pakam',job:'Karyawan',in:'2026-01-20',st:'Keluar',out:'2026-06-30'}];
+let B=[
+{id:1,room:'01',amt:800000,per:'20 Sep – 20 Okt 2026',due:'2026-10-20',pay:[]},
+{id:2,room:'03',amt:1000000,per:'25 Sep – 25 Okt 2026',due:'2026-10-25',pay:[{d:'2026-10-02',amt:600000,m:'Transfer'}]},
+{id:3,room:'04',amt:700000,per:'28 Agu – 28 Sep 2026',due:'2026-09-28',pay:[]},
+{id:4,room:'05',amt:750000,per:'1 Sep – 1 Okt 2026',due:'2026-10-01',pay:[{d:'2026-09-30',amt:750000,m:'Cash'}]},
+{id:5,room:'01',amt:800000,per:'20 Agu – 20 Sep 2026',due:'2026-09-20',pay:[{d:'2026-09-18',amt:800000,m:'Cash'}]},
+{id:6,room:'03',amt:1000000,per:'25 Agu – 25 Sep 2026',due:'2026-09-25',pay:[{d:'2026-09-24',amt:400000,m:'Transfer'},{d:'2026-09-25',amt:600000,m:'Transfer'}]}];
+let O={name:'Pemilik Kost',email:'pemilik@kost.id',hp:'0812-0000-1234'};
+const H=[{n:'Rumah 1'},{n:'Rumah 2',k:8,t:6},{n:'Rumah 3',k:12,t:10}];
+const S={house:'Rumah 1',view:'login',p:{},hist:[],mode:'normal',ft:'unpaid',rf:'Semua',q:'',tf:'Aktif',step:1,draft:{},bf:{q:'',room:'',per:'',st:''},pf:{room:'',m:'',a:'',z:''},rep:{mode:'bulan',m:'2026-10',y:'2026',a:'2026-10-01',z:'2026-10-31'}};
+const paid=b=>b.pay.reduce((a,p)=>a+p.amt,0),left=b=>b.amt-paid(b);
+const st=b=>paid(b)>=b.amt?'LUNAS':new Date(b.due)<TODAY?'TERLAMBAT':paid(b)>0?'SEBAGIAN':'BELUM_BAYAR';
+const LB={LUNAS:'Lunas',SEBAGIAN:'Sebagian',BELUM_BAYAR:'Belum bayar',TERLAMBAT:'Terlambat'},CL={LUNAS:'ok',SEBAGIAN:'warn',BELUM_BAYAR:'gray',TERLAMBAT:'bad'};
+const sb=b=>`<span class="bd ${CL[st(b)]}">${st(b)==='LUNAS'?'✓ ':''}${LB[st(b)]}</span>`;
+const act=r=>T.filter(t=>t.room===r&&t.st==='Aktif');
+const tn=b=>act(b.room).map(t=>t.name.split(' ')[0]).join(' & ')||'—';
+const unpaid=()=>B.filter(b=>st(b)!=='LUNAS');
+const rm=n=>R.find(r=>r.n===n);
+const ini=n=>n[0].toUpperCase();
+const tab={home:'home',rooms:'rooms',roomDetail:'rooms',roomForm:'rooms',tenants:'tenants',tenantForm:'tenants',tenantDetail:'tenants',fin:'fin',billDetail:'fin',payForm:'fin',more:'more',report:'more',settings:'more',profile:'more',password:'more',houseSet:'more'};
+
+function toast(m){const t=$('#toast');t.textContent=m;t.style.display='block';clearTimeout(toast.i);toast.i=setTimeout(()=>t.style.display='none',2400)}
+function go(v,p={}){S.hist.push([S.view,S.p]);S.view=v;S.p=p;S.step=1;render();scrollTo(0,0)}
+function back(){const h=S.hist.pop();if(h){S.view=h[0];S.p=h[1]}else S.view='home';render()}
+function nav(v){S.hist=[];S.view=v;S.p={};S.q='';render();scrollTo(0,0)}
+function setMode(m){S.mode=m;render()}
+function hd(t,bk=true,r=''){return `<div class="hd">${bk?'<button class="ib" aria-label="Kembali" onclick="back()">←</button>':''}<h1>${t}</h1>${r}</div>`}
+function gate(list,empty){if(S.mode==='loading')return '<div class="skel"></div><div class="skel"></div><div class="skel"></div>';
+ if(S.mode==='error')return `<div class="empty"><div class="em">⚠️</div><h3>Terjadi kesalahan</h3><p>Data belum dapat dimuat. Periksa koneksi internet.</p><button class="btn" onclick="setMode('normal')">Coba lagi</button></div>`;
+ if(S.mode==='empty')return empty;return list}
+const emptyBox=(e,t,p,btn)=>`<div class="empty"><div class="em">${e}</div><h3>${t}</h3><p>${p}</p>${btn||''}</div>`;
+const fld=(l,h)=>`<label class="lbl">${l}</label>${h}`;
+function sheet(h){$('#ov').innerHTML=`<div class="ov" onclick="if(event.target===this)closeS()"><div class="sh" role="dialog">${h}</div></div>`}
+function closeS(){$('#ov').innerHTML=''}
+function confirmD(t,b,ok,code,cls='bad'){sheet(`<h3>${t}</h3><p class="mute">${b}</p><div class="row" style="margin-top:14px"><button class="btn ghost" onclick="closeS()">Batal</button><button class="btn ${cls}" onclick="closeS();${code}">${ok}</button></div>`)}
+
+
+const MN=['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+const ym=i=>i.slice(0,7),mlabel=k=>MN[+k.slice(5)-1]+' '+k.slice(0,4);
+const RM=['2026-10','2026-09','2026-08','2026-07','2026-06','2026-05'];
+const periods=()=>[...new Set(B.map(b=>ym(b.due)))].sort().reverse();
+const nf=f=>Object.entries(f).filter(([k,v])=>k!=='q'&&v).length;
+const roomOpts=v=>'<option value="">Semua kamar</option>'+R.map(r=>`<option value="${r.n}" ${v===r.n?'selected':''}>Kamar ${r.n}</option>`).join('');
+const none=k=>`<p class="mute" style="text-align:center;padding:30px 0">Tidak ada hasil. <a href="#" onclick="resetF('${k}');return false" style="color:var(--brandd);font-weight:600">Reset filter</a></p>`;
+function bills(){const f=S.bf,q=f.q.toLowerCase();return B.filter(b=>(!f.room||b.room===f.room)&&(!f.per||ym(b.due)===f.per)&&(!f.st||st(b)===f.st)&&(!q||('kamar '+b.room+' '+tn(b)).toLowerCase().includes(q))).sort((a,c)=>c.due.localeCompare(a.due))}
+function pays(){const f=S.pf;return B.flatMap(b=>b.pay.map((p,i)=>({...p,b,i}))).filter(p=>(!f.room||p.b.room===f.room)&&(!f.m||p.m===f.m)&&(!f.a||p.d>=f.a)&&(!f.z||p.d<=f.z)).sort((a,c)=>c.d.localeCompare(a.d))}
+function rng(){const r=S.rep;return r.mode==='bulan'?[r.m+'-01',r.m+'-31']:r.mode==='tahun'?[r.y+'-01-01',r.y+'-12-31']:[r.a,r.z]}
+function setRep(k,v){S.rep[k]=v;render()}
+function resetF(k){S[k]=k==='bf'?{q:'',room:'',per:'',st:''}:{room:'',m:'',a:'',z:''};closeS();render()}
+function billFilter(){const f=S.bf;sheet(`<h3>Filter tagihan</h3>${fld('Kamar',`<select id="fr">${roomOpts(f.room)}</select>`)}${fld('Periode (bulan jatuh tempo)',`<select id="fp"><option value="">Semua periode</option>${periods().map(k=>`<option value="${k}" ${f.per===k?'selected':''}>${mlabel(k)}</option>`).join('')}</select>`)}${fld('Status',`<select id="fs"><option value="">Semua status</option>${Object.keys(LB).map(k=>`<option value="${k}" ${f.st===k?'selected':''}>${LB[k]}</option>`).join('')}</select>`)}<div class="row" style="margin-top:14px"><button class="btn ghost" onclick="resetF('bf')">Reset</button><button class="btn" onclick="S.bf.room=$('#fr').value;S.bf.per=$('#fp').value;S.bf.st=$('#fs').value;closeS();render()">Terapkan</button></div>`)}
+function payFilter(){const f=S.pf;sheet(`<h3>Filter pembayaran</h3>${fld('Kamar',`<select id="gr">${roomOpts(f.room)}</select>`)}${fld('Metode',`<select id="gm"><option value="">Semua metode</option>${['Cash','Transfer'].map(m=>`<option ${f.m===m?'selected':''}>${m}</option>`).join('')}</select>`)}<div class="row"><div>${fld('Dari tanggal',`<input id="ga" type="date" value="${f.a}">`)}</div><div>${fld('Sampai tanggal',`<input id="gz" type="date" value="${f.z}">`)}</div></div><div class="row" style="margin-top:14px"><button class="btn ghost" onclick="resetF('pf')">Reset</button><button class="btn" onclick="S.pf.room=$('#gr').value;S.pf.m=$('#gm').value;S.pf.a=$('#ga').value;S.pf.z=$('#gz').value;closeS();render()">Terapkan</button></div>`)}
+function delPayAsk(bid,i){const b=B.find(x=>x.id===bid),p=b.pay[i];confirmD('Hapus pembayaran?',`Pembayaran ${rp(p.amt)} (${p.m}, ${fd(p.d)}) untuk Kamar ${b.room} akan dihapus. Sisa tagihan akan bertambah dan status tagihan bisa berubah.`,'Ya, hapus',`delPay(${bid},${i})`)}
+function delPay(bid,i){B.find(x=>x.id===bid).pay.splice(i,1);toast('Pembayaran dihapus');render()}
+function installSheet(){sheet(`<h3>Install aplikasi</h3><p class="mute sm">Pasang Kost Manager di layar utama supaya terbuka seperti aplikasi biasa.</p><div class="card flat"><div class="b">Android (Chrome)</div><div class="sm mute">Ketuk menu ⋮ → Install aplikasi atau Tambahkan ke Layar Utama.</div></div><div class="card flat"><div class="b">iPhone (Safari)</div><div class="sm mute">Ketuk tombol Bagikan → Tambah ke Layar Utama.</div></div><button class="btn" onclick="closeS()">Mengerti</button>`)}
+function saveProfile(){const n=$('#on').value.trim(),m=$('#oe').value.trim(),h=$('#oh').value.trim(),e=$('#e');
+ if(!n){e.textContent='Nama wajib diisi.';return}if(!m){e.textContent='Email / username wajib diisi.';return}
+ O={name:n,email:m,hp:h};toast('Profil disimpan');back()}
+function savePass(){const a=$('#p0').value,b=$('#p1').value,c=$('#p2').value,e=$('#e');
+ if(!a){e.textContent='Masukkan password lama.';return}if(b.length<8){e.textContent='Password baru minimal 8 karakter.';return}
+ if(b===a){e.textContent='Password baru harus berbeda dari password lama.';return}if(b!==c){e.textContent='Ulangi password baru dengan sama persis.';return}
+ toast('Password diubah');back()}
+function saveHouse(i){const n=$('#hn').value.trim(),e=$('#e');if(!n){e.textContent='Nama rumah wajib diisi.';return}
+ if(H.some((h,j)=>j!==i&&h.n.toLowerCase()===n.toLowerCase())){e.textContent='Nama rumah sudah dipakai.';return}
+ if(S.house===H[i].n)S.house=n;H[i].n=n;toast('Nama rumah disimpan');back()}
+
+const V={
+login(){return `<div class="pad" style="padding-top:12vh"><div class="av" style="border-radius:14px;width:48px;height:48px">🏠</div><h1 style="font-size:30px;margin:14px 0 4px;letter-spacing:-.02em">Kost Manager</h1><p class="mute" style="margin:0 0 20px">Kelola kost dengan lebih mudah.</p>
+${fld('Email / Username','<input value="pemilik@kost.id" autocomplete="username">')}${fld('Password','<input type="password" value="rahasia123" autocomplete="current-password">')}
+<button class="btn" onclick="S.hist=[];S.view='houses';render()">Masuk</button><p style="text-align:center"><a class="mute sm" href="#" onclick="toast('Hubungi admin untuk reset password');return false">Lupa password</a></p></div>`},
+houses(){const k=R.length,t=R.filter(r=>act(r.n).length).length;
+ return `<div class="pad" style="padding-top:28px"><h1 style="font-size:26px;margin:0">Selamat datang 👋</h1><p class="mute">Pilih rumah kost</p>`+H.map((h,i)=>{const kk=i?h.k:k,tt=i?h.t:t;
+ return `<button class="card" onclick="S.house='${h.n}';S.hist=[];S.view='home';render()"><div class="row sp"><div><div class="b" style="font-size:18px">🏠 ${h.n}</div><div class="mute" style="margin-top:10px">${kk} kamar</div><div class="b sm">${tt} terisi · ${kk-tt} kosong</div></div><div class="fit mute" style="font-size:22px">→</div></div></button>`}).join('')+`</div>`},
+home(){const k=R.length,t=R.filter(r=>act(r.n).length).length,u=unpaid(),tot=u.reduce((a,b)=>a+left(b),0),na=T.filter(x=>x.st==='Aktif');
+ const nw=[...na].sort((a,b)=>b.in.localeCompare(a.in)).slice(0,2);
+ return hd(S.house,true,'<button class="ib" aria-label="Menu">⋮</button>')+`<div class="pad">${gate(`
+ <div class="grid"><div class="card flat"><div class="big">${k}</div><div class="mute sm">Kamar</div><div class="sm b" style="margin-top:8px">${t} terisi · ${k-t} kosong</div></div>
+ <div class="card flat"><div class="big">${na.length}</div><div class="mute sm">Penghuni aktif</div></div></div>
+ <button class="card" style="margin-top:10px" onclick="S.ft='unpaid';nav('fin')"><div class="mute sm">Belum bayar</div><div class="big" style="color:var(--bad)">${rp(tot)}</div><div class="sm b">${u.length} tagihan</div></button>
+ <h2>Penghuni terbaru</h2>${nw.map(x=>`<button class="card" onclick="go('tenantDetail',{id:${x.id}})"><div class="row"><div class="av fit">${ini(x.name)}</div><div><div class="b">${x.name.split(' ')[0]}</div><div class="sm mute">Kamar ${x.room} · Masuk ${fd(x.in)}</div></div></div></button>`).join('')}
+ <button class="btn" onclick="go('tenantForm')">+ Tambah Penghuni</button><div class="row"><button class="btn ghost" onclick="go('roomForm')">+ Tambah Kamar</button><button class="btn ghost" onclick="S.ft='unpaid';nav('fin')">Lihat Belum Bayar</button></div>`,
+ emptyBox('🏠','Rumah ini masih kosong','Mulai dengan menambahkan kamar pertama.',`<button class="btn" onclick="go('roomForm')">+ Tambah Kamar</button>`))}</div>`},
+rooms(){let l=R.filter(r=>r.n.includes(S.q)&&(S.rf==='Semua'||(S.rf==='Terisi')===!!act(r.n).length));
+ const list=l.length?l.map(r=>{const a=act(r.n);return `<button class="card" onclick="go('roomDetail',{n:'${r.n}'})"><div class="row sp"><div class="b" style="font-size:17px">Kamar ${r.n}</div><span class="bd fit ${a.length?'brand':'gray'}">${a.length?'Terisi':'Kosong'}</span></div><div class="b" style="margin:6px 0">${rp(r.p)} <span class="mute sm" style="font-weight:500">/ bulan</span></div>${a.length?a.map(x=>`<div class="sm">👤 ${x.name.split(' ')[0]}</div>`).join('')+`<div class="sm mute" style="margin-top:4px">${a.length} penghuni</div>`:'<div class="sm mute">Belum ada penghuni</div>'}</button>`}).join(''):`<p class="mute" style="text-align:center;padding:30px 0">Kamar tidak ditemukan.</p>`;
+ return hd('Kamar',false)+`<div class="pad"><input placeholder="🔍 Cari nomor kamar…" value="${S.q}" oninput="S.q=this.value;render(1)"><div class="chips">${['Semua','Terisi','Kosong'].map(c=>`<button class="chip ${S.rf===c?'on':''}" onclick="S.rf='${c}';render()">${c}</button>`).join('')}</div>${gate(list,emptyBox('🛏️','Belum ada kamar','Tambahkan kamar pertama untuk mulai mengelola kost.',`<button class="btn" onclick="go('roomForm')">+ Tambah Kamar</button>`))}</div><button class="fab" onclick="go('roomForm')">＋ Tambah Kamar</button>`},
+roomDetail({n}){const r=rm(n),a=act(n),h=T.filter(t=>t.room===n&&t.st==='Keluar');
+ return hd('Kamar '+n)+`<div class="pad"><div class="row sp"><div><div class="big">${rp(r.p)}</div><div class="mute sm">per bulan${r.note?' · '+r.note:''}</div></div><button class="btn ghost sm fit" style="width:auto;padding:10px 16px" onclick="go('roomForm',{n:'${n}'})">Edit</button></div>
+ <h2>Penghuni aktif</h2>${a.length?a.map(x=>`<button class="card" onclick="go('tenantDetail',{id:${x.id}})"><div class="row"><div class="av fit">${ini(x.name)}</div><div><div class="b">${x.name.split(' ')[0]}</div><div class="sm mute">Masuk ${fd(x.in)}</div></div><div class="fit mute">→</div></div></button>`).join(''):'<p class="mute">Belum ada penghuni.</p>'}
+ <button class="btn" onclick="go('tenantForm',{room:'${n}'})">+ Tambah Penghuni</button>
+ <h2>Riwayat penghuni</h2>${h.length?h.map(x=>`<div class="card flat"><div class="row sp"><div class="b">${x.name}</div><span class="bd gray fit">Keluar</span></div><div class="sm mute">${fd(x.in)} – ${fd(x.out)}</div></div>`).join(''):'<p class="mute sm">Belum ada riwayat.</p>'}
+ <button class="btn ghost" style="color:var(--bad)" onclick="delRoom('${n}')">Hapus kamar</button></div>`},
+roomForm({n}={}){const r=n?rm(n):{n:'',p:'',note:''};
+ return hd(n?'Edit Kamar':'Tambah Kamar')+`<div class="pad">${fld('Nomor kamar',`<input id="rn" value="${r.n}" placeholder="Contoh: 06">`)}${fld('Harga kamar / bulan',`<input id="rp" inputmode="numeric" value="${r.p}" placeholder="Rp 800000">`)}<p class="sm mute" style="margin:6px 0 0">Perubahan harga tidak mengubah tagihan lama.</p>${fld('Catatan (opsional)',`<textarea id="rnote" rows="2">${r.note||''}</textarea>`)}<div id="e" class="err"></div><button class="btn" onclick="saveRoom('${n||''}')">Simpan Kamar</button></div>`},
+tenants(){const l=T.filter(t=>t.st===S.tf&&(t.name+t.hp).toLowerCase().includes(S.q.toLowerCase()));
+ const list=l.length?l.map(x=>`<button class="card" onclick="go('tenantDetail',{id:${x.id}})"><div class="row"><div class="av fit">${ini(x.name)}</div><div><div class="b">${x.name.split(' ')[0]}</div><div class="sm">Kamar ${x.room}</div><div class="sm mute">${x.hp}</div></div><span class="bd fit ${x.st==='Aktif'?'brand':'gray'}">${x.st}</span></div></button>`).join(''):`<p class="mute" style="text-align:center;padding:30px 0">Tidak ada hasil.</p>`;
+ return hd('Penghuni',false)+`<div class="pad"><input placeholder="🔍 Cari nama / nomor HP…" value="${S.q}" oninput="S.q=this.value;render(1)"><div class="chips">${['Aktif','Keluar'].map(c=>`<button class="chip ${S.tf===c?'on':''}" onclick="S.tf='${c}';render()">${c}</button>`).join('')}</div>${gate(list,emptyBox('👥','Belum ada penghuni','Tambahkan penghuni baru untuk mulai mengelola kost.',`<button class="btn" onclick="go('tenantForm')">+ Tambah Penghuni</button>`))}</div><button class="fab" onclick="go('tenantForm')">＋ Tambah</button>`},
+tenantForm({room}={}){const d=S.draft;
+ const s1=`<label class="upl ${d.ktp?'done':''}">${d.ktp?'✓ '+d.ktp:'📷 Tambah foto KTP'}<input type="file" accept="image/*" capture="environment" hidden onchange="S.draft.ktp=this.files[0]?.name;render()"></label>
+ ${fld('Nama lengkap',`<input id="f1" value="${d.name||''}">`)}${fld('Nomor HP',`<input id="f2" inputmode="tel" value="${d.hp||''}">`)}${fld('Alamat asal',`<input id="f3" value="${d.addr||''}">`)}${fld('Pekerjaan',`<input id="f4" value="${d.job||''}">`)}<div id="e" class="err"></div><button class="btn" onclick="next1()">Lanjut</button>`;
+ const s2=`${fld('Tanggal masuk',`<input id="f5" type="date" value="${d.in||'2026-10-04'}">`)}${fld('Pilih kamar',`<select id="f6">${R.map(r=>`<option value="${r.n}" ${(d.room||room)===r.n?'selected':''}>Kamar ${r.n} — ${rp(r.p)}</option>`).join('')}</select>`)}<p class="sm mute">Jika kamar sudah berpenghuni, tagihan tetap satu untuk kamar.</p><button class="btn" onclick="saveTenant()">Simpan Penghuni</button><button class="btn ghost" onclick="S.step=1;render()">Kembali</button>`;
+ return hd('Tambah Penghuni')+`<div class="pad"><div class="steps"><i class="on"></i><i class="${S.step>1?'on':''}"></i></div><p class="sm mute" style="margin:4px 0">Langkah ${S.step} dari 2 · ${S.step>1?'Hunian':'Data diri'}</p>${S.step>1?s2:s1}</div>`},
+tenantDetail({id}){const x=T.find(t=>t.id===id),r=rm(x.room);
+ return hd('Detail Penghuni')+`<div class="pad" style="text-align:center"><div class="av lg">${ini(x.name)}</div><div class="b" style="font-size:20px">${x.name}</div><div class="mute">Kamar ${x.room}</div><span class="bd ${x.st==='Aktif'?'brand':'gray'}" style="margin-top:6px">${x.st}</span></div>
+ <div class="pad"><h2>Informasi</h2><div class="card flat"><div class="kv"><span>No. HP</span><span>${x.hp}</span></div><div class="kv"><span>Alamat asal</span><span>${x.addr}</span></div><div class="kv"><span>Pekerjaan</span><span>${x.job}</span></div><div class="kv"><span>Tanggal masuk</span><span>${fd(x.in)}</span></div>${x.out?`<div class="kv"><span>Tanggal keluar</span><span>${fd(x.out)}</span></div>`:''}</div>
+ <button class="btn ghost" onclick="sheet('<h3>Foto KTP</h3><div class=upl style=padding:60px>🪪 Pratinjau KTP<br><span class=sm>Hanya terlihat oleh pemilik</span></div><button class=btn onclick=closeS()>Tutup</button>')">Lihat Foto KTP</button>
+ <h2>Kamar</h2><div class="card flat"><div class="b">Kamar ${x.room}</div><div class="mute sm">${rp(r.p)} / bulan</div></div>
+ ${x.st==='Aktif'?`<button class="btn ghost" onclick="moveSheet(${id})">Pindah Kamar</button><button class="btn bad" onclick="exitSheet(${id})">Penghuni Keluar</button>`:''}</div>`},
+fin(){const tabs=[['bills','Tagihan'],['pays','Pembayaran'],['unpaid','Belum Bayar']];
+ const card=b=>`<button class="card" onclick="go('billDetail',{id:${b.id}})"><div class="row sp"><div><div class="b">${tn(b)}</div><div class="sm mute">Kamar ${b.room} · Jatuh tempo ${fd(b.due)}</div></div>${sb(b)}</div>${b.pay.length||S.ft==='unpaid'?`<div class="row sp" style="margin-top:8px"><span class="sm mute">Sisa</span><span class="b" style="flex:0 0 auto">${rp(left(b))}</span></div>`:''}</button>`;
+ let body;
+ if(S.ft==='bills'){const l=bills(),n=nf(S.bf);body=`<div class="row" style="margin-bottom:10px"><input placeholder="🔍 Cari kamar / nama…" value="${S.bf.q}" oninput="S.bf.q=this.value;render(1)"><button class="chip fit ${n?'on':''}" onclick="billFilter()">Filter${n?' ('+n+')':''}</button></div>`+gate(l.length?l.map(card).join(''):none('bf'),emptyBox('🧾','Belum ada tagihan','Tagihan dibuat otomatis saat ada penghuni.'))}
+ else if(S.ft==='pays'){const l=pays(),n=nf(S.pf);body=`<div class="row" style="margin-bottom:10px"><div class="sm mute">${l.length} pembayaran · ${rp(l.reduce((a,p)=>a+p.amt,0))}</div><button class="chip fit ${n?'on':''}" onclick="payFilter()">Filter${n?' ('+n+')':''}</button></div>`+gate(l.length?l.map(p=>`<div class="card flat"><div class="row sp"><div><div class="b">Kamar ${p.b.room} · ${tn(p.b)}</div><div class="sm mute">${fd(p.d)} · ${p.m}</div></div><div class="b fit">${rp(p.amt)}</div><button class="ib fit" aria-label="Hapus pembayaran" onclick="delPayAsk(${p.b.id},${p.i})">🗑</button></div></div>`).join(''):none('pf'),emptyBox('💸','Belum ada pembayaran','Pembayaran yang dicatat akan muncul di sini.'))}
+ else{const u=unpaid(),tot=u.reduce((a,b)=>a+left(b),0);body=gate(`<div class="card flat" style="background:var(--bads);border-color:transparent"><div class="sm mute">Total belum bayar</div><div class="big" style="color:var(--bad)">${rp(tot)}</div><div class="sm b">${u.length} tagihan</div></div><div style="height:10px"></div>`+u.map(b=>`<div class="card flat"><div class="row sp"><div><div class="b">${tn(b)}</div><div class="sm mute">Kamar ${b.room} · Jatuh tempo ${fd(b.due)}</div></div>${sb(b)}</div>${paid(b)?`<div class="sm mute" style="margin-top:6px">Tagihan ${rp(b.amt)} · Dibayar ${rp(paid(b))}</div>`:''}<div class="row sp" style="margin:6px 0 10px"><span class="mute sm">Sisa</span><span class="b" style="flex:0 0 auto;font-size:18px">${rp(left(b))}</span></div><div class="row"><button class="btn sm" onclick="go('payForm',{id:${b.id}})">Catat Pembayaran</button><button class="btn sm wa" onclick="wa(${b.id})">WhatsApp</button></div></div>`).join(''),emptyBox('🎉','Tidak ada tagihan tertunggak','Semua pembayaran sudah aman.'))}
+ return hd('Keuangan',false)+`<div class="pad"><div class="chips">${tabs.map(t=>`<button class="chip ${S.ft===t[0]?'on':''}" onclick="S.ft='${t[0]}';render()">${t[1]}</button>`).join('')}</div>${body}</div>`},
+billDetail({id}){const b=B.find(x=>x.id===id);
+ return hd('Detail Tagihan')+`<div class="pad"><div class="row sp"><div><div class="b" style="font-size:20px">Kamar ${b.room}</div><div class="mute sm">${tn(b)}</div></div>${sb(b)}</div>
+ <div class="card flat" style="margin-top:14px"><div class="kv"><span>Periode</span><span>${b.per}</span></div><div class="kv"><span>Jatuh tempo</span><span>${fd(b.due)}</span></div><div class="kv"><span>Total tagihan</span><span>${rp(b.amt)}</span></div><div class="kv"><span>Sudah dibayar</span><span>${rp(paid(b))}</span></div><div class="kv"><span>Sisa</span><span style="color:${left(b)?'var(--bad)':'var(--ok)'}">${rp(left(b))}</span></div></div>
+ <h2>Riwayat pembayaran</h2>${b.pay.length?b.pay.map((p,i)=>`<div class="card flat"><div class="row sp"><div><div class="b">${fd(p.d)}</div><div class="sm mute">${p.m}</div></div><div class="b fit">${rp(p.amt)}</div><button class="ib fit" aria-label="Hapus pembayaran" onclick="delPayAsk(${b.id},${i})">🗑</button></div></div>`).join(''):'<p class="mute sm">Belum ada pembayaran.</p>'}
+ ${left(b)?`<button class="btn" onclick="go('payForm',{id:${b.id}})">+ Catat Pembayaran</button>`:''}</div>`},
+payForm({id}){const b=B.find(x=>x.id===id);
+ return hd('Catat Pembayaran')+`<div class="pad"><div class="card flat"><div class="b">Kamar ${b.room} · ${tn(b)}</div><div class="sm mute">Sisa tagihan</div><div class="big">${rp(left(b))}</div></div>
+ ${fld('Jumlah pembayaran',`<input id="pa" inputmode="numeric" placeholder="Rp" value="${left(b)}">`)}<div id="e" class="err"></div>
+ ${fld('Metode',`<div class="seg"><label><input type="radio" name="m" value="Cash" checked><span>Cash</span></label><label><input type="radio" name="m" value="Transfer"><span>Transfer</span></label></div>`)}
+ ${fld('Tanggal',`<input id="pd" type="date" value="2026-10-04">`)}${fld('Catatan',`<input id="pn">`)}<button class="btn" onclick="savePay(${id})">Simpan Pembayaran</button></div>`},
+more(){const row=(i,t,f)=>`<button class="card" onclick="${f}"><div class="row"><span class="fit" style="font-size:20px">${i}</span><span class="b">${t}</span><span class="fit mute">→</span></div></button>`;
+ return hd('Lainnya',false)+`<div class="pad">${row('📊','Laporan',"go('report')")}${row('⚙️','Pengaturan',"go('settings')")}${row('🏠','Pilih / kembali ke rumah',"S.hist=[];S.view='houses';render()")}</div>`},
+report(){const r=S.rep,[a,z]=rng(),inR=d=>d>=a&&d<=z;
+ const bs=B.filter(b=>inR(b.due)),ps=bs.flatMap(b=>b.pay.map(p=>({...p,b}))).sort((x,y)=>y.d.localeCompare(x.d));
+ const tot=bs.reduce((q,b)=>q+b.amt,0),pd=ps.reduce((q,p)=>q+p.amt,0),bel=bs.reduce((q,b)=>q+left(b),0);
+ const ctl=r.mode==='bulan'?`<select onchange="setRep('m',this.value)">${RM.map(k=>`<option value="${k}" ${r.m===k?'selected':''}>${mlabel(k)}</option>`).join('')}</select>`
+ :r.mode==='tahun'?`<select onchange="setRep('y',this.value)">${['2026','2025'].map(y=>`<option ${r.y===y?'selected':''}>${y}</option>`).join('')}</select>`
+ :`<div class="row"><div>${fld('Dari tanggal',`<input type="date" value="${r.a}" onchange="setRep('a',this.value)">`)}</div><div>${fld('Sampai tanggal',`<input type="date" value="${r.z}" onchange="setRep('z',this.value)">`)}</div></div>${r.a>r.z?'<div class="err">Tanggal akhir harus setelah tanggal awal.</div>':''}`;
+ const stat=(l,v,c)=>`<div class="card flat"><div class="mute sm">${l}</div><div class="b" style="font-size:18px;${c?'color:var(--'+c+')':''}">${v}</div></div>`;
+ return hd('Laporan')+`<div class="pad"><div class="chips">${[['bulan','Bulan'],['tahun','Tahun'],['rentang','Rentang tanggal']].map(m=>`<button class="chip ${r.mode===m[0]?'on':''}" onclick="setRep('mode','${m[0]}')">${m[1]}</button>`).join('')}</div>${ctl}
+ <div class="grid" style="margin-top:12px">${stat('Total tagihan',rp(tot))}${stat('Sudah dibayar',rp(pd),'ok')}${stat('Belum dibayar',rp(bel),bel?'bad':'ok')}${stat('Transaksi',ps.length)}</div>
+ <div class="card flat" style="margin-top:10px"><div class="kv"><span>Penghuni aktif</span><span>${T.filter(t=>t.st==='Aktif').length}</span></div><div class="kv"><span>Tagihan lunas</span><span>${bs.filter(b=>st(b)==='LUNAS').length}</span></div><div class="kv"><span>Tagihan belum lunas</span><span>${bs.filter(b=>st(b)!=='LUNAS').length}</span></div></div>
+ <h2>Daftar transaksi</h2>${ps.length?ps.map(p=>`<div class="card flat"><div class="row sp"><div><div class="b">Kamar ${p.b.room}</div><div class="sm mute">${fd(p.d)} · ${p.m}</div></div><div class="b fit">${rp(p.amt)}</div></div></div>`).join(''):'<p class="mute sm">Belum ada transaksi di periode ini.</p>'}</div>`},
+settings(){const g=(t,l)=>`<h2>${t}</h2>`+l.map(([x,f,sub])=>`<button class="card" onclick="${f}"><div class="row"><div><div class="b">${x}</div>${sub?`<div class="sm mute">${sub}</div>`:''}</div><span class="fit mute">→</span></div></button>`).join('');
+ return hd('Pengaturan')+`<div class="pad">${g('Akun',[['Profil pemilik',"go('profile')",O.name]])}${g('Rumah',H.map((h,i)=>[h.n,`go('houseSet',{i:${i}})`]))}${g('Keamanan',[['Ubah password',"go('password')"]])}${g('Aplikasi',[['Install aplikasi',"installSheet()"]])}<button class="btn ghost" style="color:var(--bad);margin-top:20px" onclick="confirmD('Keluar dari aplikasi?','Kamu perlu login lagi untuk membuka data kost.','Ya, keluar',&quot;S.hist=[];S.view='login';render()&quot;)">Keluar</button></div>`},
+profile(){return hd('Profil Pemilik')+`<div class="pad" style="text-align:center"><div class="av lg">${ini(O.name)}</div></div><div class="pad" style="text-align:left">${fld('Nama',`<input id="on" value="${O.name}">`)}${fld('Email / Username',`<input id="oe" value="${O.email}">`)}${fld('Nomor HP (opsional)',`<input id="oh" inputmode="tel" value="${O.hp}">`)}<div id="e" class="err"></div><button class="btn" onclick="saveProfile()">Simpan Profil</button></div>`},
+password(){return hd('Ubah Password')+`<div class="pad">${fld('Password lama','<input id="p0" type="password" autocomplete="current-password">')}${fld('Password baru','<input id="p1" type="password" autocomplete="new-password">')}<p class="sm mute" style="margin:6px 0 0">Minimal 8 karakter.</p>${fld('Ulangi password baru','<input id="p2" type="password" autocomplete="new-password">')}<div id="e" class="err"></div><button class="btn" onclick="savePass()">Simpan Password</button></div>`},
+houseSet({i}){const h=H[i],k=i?h.k:R.length,t=i?h.t:R.filter(r=>act(r.n).length).length;
+ return hd('Pengaturan '+h.n)+`<div class="pad">${fld('Nama rumah',`<input id="hn" value="${h.n}">`)}<div id="e" class="err"></div><div class="card flat" style="margin-top:14px"><div class="kv"><span>Jumlah kamar</span><span>${k}</span></div><div class="kv"><span>Terisi</span><span>${t}</span></div><div class="kv"><span>Kosong</span><span>${k-t}</span></div></div><button class="btn" onclick="saveHouse(${i})">Simpan</button></div>`}
+};
+
+function render(keep){const v=V[S.view](S.p),n=!['login','houses'].includes(S.view),t=tab[S.view];
+ const a=document.activeElement,id=a&&a.tagName==='INPUT'&&a.placeholder.includes('Cari')?1:0,pos=id?a.selectionStart:0;
+ $('#app').innerHTML=`<div class="proto">Prototipe:${[['normal','Normal'],['empty','Kosong'],['loading','Memuat'],['error','Error']].map(m=>`<button class="${S.mode===m[0]?'on':''}" onclick="setMode('${m[0]}')">${m[1]}</button>`).join('')}</div><div class="wrap">${v}</div>${n?`<nav class="bn" aria-label="Menu utama">${[['home','🏠','Beranda'],['rooms','🛏','Kamar'],['tenants','👥','Penghuni'],['fin','💰','Keuangan'],['more','☰','Lainnya']].map(i=>`<button class="${t===i[0]?'on':''}" onclick="nav('${i[0]}')"><i>${i[1]}</i>${i[2]}</button>`).join('')}</nav>`:''}`;
+ if(keep&&id){const i=$('input[placeholder*=Cari]');i.focus();i.setSelectionRange(pos,pos)}else closeS()}
+
+function saveRoom(old){const n=$('#rn').value.trim(),p=parseInt($('#rp').value.replace(/\D/g,''))||0,e=$('#e');
+ if(!n){e.textContent='Nomor kamar wajib diisi.';return}if(!p){e.textContent='Harga kamar wajib diisi.';return}
+ if(R.some(r=>r.n===n&&r.n!==old)){e.textContent='Nomor kamar sudah dipakai di rumah ini.';return}
+ if(old){const r=rm(old);r.p=p;r.note=$('#rnote').value;if(n!==old){T.forEach(t=>{if(t.room===old)t.room=n});B.forEach(b=>{if(b.room===old)b.room=n});r.n=n}}else R.push({n,p,note:$('#rnote').value});
+ toast('Kamar disimpan');back()}
+function delRoom(n){if(T.some(t=>t.room===n)||B.some(b=>b.room===n))return toast('Kamar punya riwayat, tidak bisa dihapus');
+ confirmD('Hapus Kamar '+n+'?','Kamar ini belum punya penghuni atau tagihan.','Ya, hapus',`R=R.filter(r=>r.n!=='${n}');toast('Kamar dihapus');nav('rooms')`)}
+function next1(){const d=S.draft;d.name=$('#f1').value.trim();d.hp=$('#f2').value.trim();d.addr=$('#f3').value.trim();d.job=$('#f4').value.trim();
+ const m=!d.ktp?'Foto KTP wajib diunggah.':!d.name?'Nama wajib diisi.':!d.hp?'Nomor HP wajib diisi.':!d.addr?'Alamat asal wajib diisi.':!d.job?'Pekerjaan wajib diisi.':'';
+ if(m){$('#e').textContent=m;return}S.step=2;render()}
+function saveTenant(){const d=S.draft;T.push({id:T.length+1,name:d.name,room:$('#f6').value,hp:d.hp,addr:d.addr,job:d.job,in:$('#f5').value,st:'Aktif'});S.draft={};toast('Penghuni disimpan');S.hist=[];S.view='tenants';S.tf='Aktif';render()}
+function moveSheet(id){const x=T.find(t=>t.id===id);sheet(`<h3>Pindah Kamar</h3><p class="mute sm">${x.name.split(' ')[0]} · Kamar saat ini: ${x.room}</p>${fld('Kamar baru',`<select id="mr">${R.filter(r=>r.n!==x.room).map(r=>`<option value="${r.n}">Kamar ${r.n} — ${rp(r.p)}</option>`).join('')}</select>`)}${fld('Tanggal pindah',`<input id="md" type="date" value="2026-10-10">`)}<button class="btn" onclick="moveAsk(${id})">Pindahkan</button><button class="btn ghost" onclick="closeS()">Batal</button>`)}
+function moveAsk(id){const x=T.find(t=>t.id===id),n=$('#mr').value,d=$('#md').value;
+ confirmD('Pindahkan '+x.name.split(' ')[0]+'?',`Kamar ${x.room} → Kamar ${n}<br><br>Tagihan berikutnya akan mengikuti harga Kamar ${n}. Tagihan lama tidak berubah.`,'Ya, pindahkan',`T.find(t=>t.id===${id}).room='${n}';toast('Penghuni dipindahkan');render()`,'')}
+function exitSheet(id){const x=T.find(t=>t.id===id);sheet(`<h3>Penghuni Keluar</h3><p class="mute sm">${x.name.split(' ')[0]} · Kamar ${x.room}</p>${fld('Tanggal keluar',`<input id="xd" type="date" value="2026-10-04">`)}<p class="mute sm">Apakah penghuni ini benar-benar sudah keluar? Data tidak dihapus dan tetap ada di riwayat.</p><div class="row"><button class="btn ghost" onclick="closeS()">Batal</button><button class="btn bad" onclick="doExit(${id})">Ya, penghuni keluar</button></div>`)}
+function doExit(id){const x=T.find(t=>t.id===id);x.st='Keluar';x.out=$('#xd').value;closeS();toast('Penghuni ditandai keluar');render()}
+function savePay(id){const b=B.find(x=>x.id===id),a=parseInt($('#pa').value.replace(/\D/g,''))||0,e=$('#e');
+ if(a<=0){e.textContent='Masukkan jumlah pembayaran.';return}if(a>left(b)){e.textContent='Jumlah pembayaran tidak boleh melebihi sisa tagihan.';return}
+ b.pay.push({d:$('#pd').value,amt:a,m:document.querySelector('input[name=m]:checked').value});toast(left(b)?'Pembayaran disimpan':'Pembayaran disimpan · Lunas');back()}
+function wa(id){const b=B.find(x=>x.id===id),t=act(b.room)[0],n=t?t.name.split(' ')[0]:'';
+ const m=`Halo ${n}, mengingatkan pembayaran kost Kamar ${b.room} sebesar ${rp(left(b))} yang belum dibayar.\n\nTerima kasih.`;
+ window.open('https://wa.me/'+(t?t.hp.replace(/\D/g,'').replace(/^0/,'62'):'')+'?text='+encodeURIComponent(m),'_blank')}
+render();
+</script></body></html>

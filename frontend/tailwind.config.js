@@ -1,0 +1,34 @@
+/** @type {import('tailwindcss').Config} */
+export default {
+  content: [
+    "./index.html",
+    "./src/**/*.{js,ts,jsx,tsx}",
+  ],
+  theme: {
+    extend: {
+      colors: {
+        bg: '#f2fbf8',
+        card: '#ffffff',
+        ink: '#12261f',
+        mute: '#58716a',
+        line: '#d3ece4',
+        brand: '#3fcfa4',
+        'brand-dark': '#0b7a5c',
+        'on-brand': '#053b2c',
+        'brand-soft': '#dff7ee',
+        ok: '#15803d',
+        'ok-soft': '#dcf3e3',
+        warn: '#b45309',
+        'warn-soft': '#fdf0d4',
+        bad: '#c81e1e',
+        'bad-soft': '#fde4e4',
+        gray: '#5b6670',
+        'gray-soft': '#e8f1ee',
+      },
+      fontFamily: {
+        sans: ['"Plus Jakarta Sans"', 'system-ui', 'sans-serif'],
+      },
+    },
+  },
+  plugins: [],
+};
