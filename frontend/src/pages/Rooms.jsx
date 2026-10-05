@@ -1,23 +1,49 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp, rp } from '../context/AppContext';
 import Header from '../components/Header';
-import { Card, Badge, Chip, FAB } from '../components/UIComponents';
+import { Card, Badge, Chip, FAB, Button } from '../components/UIComponents';
 import { SkeletonLoader, ErrorState, EmptyState } from '../components/StateComponents';
+import { getRooms } from '../api/rooms';
 
 export default function Rooms() {
   const navigate = useNavigate();
-  const { rooms, getActiveTenantsByRoom, mode, setMode } = useApp();
+  const { activePropertyId } = useApp();
 
+  const [rooms, setRooms] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState('Semua'); // 'Semua', 'Terisi', 'Kosong'
 
-  const filteredRooms = rooms.filter((r) => {
-    const activeTenants = getActiveTenantsByRoom(r.n);
-    const matchesQuery = r.n.toLowerCase().includes(query.toLowerCase());
+  const fetchRooms = useCallback(async () => {
+    if (!activePropertyId) return;
+    setLoading(true);
+    setError(false);
+    try {
+      const data = await getRooms(activePropertyId);
+      setRooms(data);
+    } catch (err) {
+      setError(true);
+    } finally {
+      setLoading(false);
+    }
+  }, [activePropertyId]);
 
-    if (filter === 'Terisi') return matchesQuery && activeTenants.length > 0;
-    if (filter === 'Kosong') return matchesQuery && activeTenants.length === 0;
+  useEffect(() => {
+    if (!activePropertyId) {
+      navigate('/pilih-rumah', { replace: true });
+      return;
+    }
+    fetchRooms();
+  }, [activePropertyId, navigate, fetchRooms]);
+
+  const filteredRooms = rooms.filter((r) => {
+    const isTerisi = r.status === 'TERISI';
+    const matchesQuery = (r.roomNumber || '').toLowerCase().includes(query.toLowerCase());
+
+    if (filter === 'Terisi') return matchesQuery && isTerisi;
+    if (filter === 'Kosong') return matchesQuery && !isTerisi;
     return matchesQuery;
   });
 
@@ -44,34 +70,41 @@ export default function Rooms() {
           ))}
         </div>
 
-        {mode === 'loading' && <SkeletonLoader />}
-        {mode === 'error' && <ErrorState onRetry={() => setMode('normal')} />}
-        {mode === 'empty' && (
+        {loading && <SkeletonLoader />}
+
+        {!loading && error && <ErrorState onRetry={fetchRooms} />}
+
+        {!loading && !error && rooms.length === 0 && (
           <EmptyState
             icon="🛏️"
             title="Belum ada kamar"
             message="Tambahkan kamar pertama untuk mulai mengelola kost."
+            actionButton={
+              <Button onClick={() => navigate('/kamar/tambah')}>
+                + Tambah Kamar
+              </Button>
+            }
           />
         )}
 
-        {mode === 'normal' && (
+        {!loading && !error && rooms.length > 0 && (
           <div>
             {filteredRooms.length === 0 ? (
               <p className="text-mute text-center py-[30px]">Kamar tidak ditemukan.</p>
             ) : (
               filteredRooms.map((r) => {
-                const activeTenants = getActiveTenantsByRoom(r.n);
-                const isTerisi = activeTenants.length > 0;
+                const isTerisi = r.status === 'TERISI';
+                const activeTenants = r.activeTenants || [];
 
                 return (
-                  <Card key={r.n} onClick={() => navigate(`/kamar/${r.n}`)}>
+                  <Card key={r.id} onClick={() => navigate(`/kamar/${r.id}`)}>
                     <div className="flex justify-between items-center">
-                      <div className="font-bold text-[17px] text-ink">Kamar {r.n}</div>
+                      <div className="font-bold text-[17px] text-ink">Kamar {r.roomNumber}</div>
                       <Badge isRoom status={isTerisi ? 'Terisi' : 'Kosong'} />
                     </div>
 
                     <div className="font-bold my-[6px] text-ink">
-                      {rp(r.p)}{' '}
+                      {rp(r.price)}{' '}
                       <span className="text-mute text-[13px] font-normal">/ bulan</span>
                     </div>
 
