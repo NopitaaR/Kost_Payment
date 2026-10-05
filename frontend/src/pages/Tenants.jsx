@@ -1,21 +1,51 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import Header from '../components/Header';
 import { Card, Badge, Chip, FAB, Avatar } from '../components/UIComponents';
 import { SkeletonLoader, ErrorState, EmptyState } from '../components/StateComponents';
+import { getTenants } from '../api/tenants';
 
 export default function Tenants() {
   const navigate = useNavigate();
-  const { tenants, mode, setMode } = useApp();
+  const { activePropertyId } = useApp();
 
+  const [tenants, setTenants] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState('Aktif'); // 'Aktif' | 'Keluar'
 
-  const filteredTenants = tenants.filter((t) => {
-    const matchesQuery = (t.name + t.hp).toLowerCase().includes(query.toLowerCase());
-    return t.st === filter && matchesQuery;
-  });
+  const fetchTenants = useCallback(async () => {
+    if (!activePropertyId) return;
+    setLoading(true);
+    setError(false);
+    try {
+      const statusParam = filter === 'Aktif' ? 'AKTIF' : 'KELUAR';
+      const data = await getTenants(activePropertyId, {
+        status: statusParam,
+        search: query.trim() || undefined,
+      });
+      setTenants(data);
+    } catch (err) {
+      setError(true);
+    } finally {
+      setLoading(false);
+    }
+  }, [activePropertyId, filter, query]);
+
+  useEffect(() => {
+    if (!activePropertyId) {
+      navigate('/pilih-rumah', { replace: true });
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      fetchTenants();
+    }, 200);
+
+    return () => clearTimeout(timer);
+  }, [activePropertyId, navigate, fetchTenants]);
 
   return (
     <div>
@@ -40,38 +70,49 @@ export default function Tenants() {
           ))}
         </div>
 
-        {mode === 'loading' && <SkeletonLoader />}
-        {mode === 'error' && <ErrorState onRetry={() => setMode('normal')} />}
-        {mode === 'empty' && (
+        {loading && <SkeletonLoader />}
+
+        {!loading && error && <ErrorState onRetry={fetchTenants} />}
+
+        {!loading && !error && tenants.length === 0 && !query && (
           <EmptyState
             icon="👥"
             title="Belum ada penghuni"
-            message="Tambahkan penghuni baru untuk mulai mengelola kost."
+            message={
+              filter === 'Aktif'
+                ? 'Tambahkan penghuni baru untuk mulai mengelola kost.'
+                : 'Belum ada penghuni yang keluar.'
+            }
           />
         )}
 
-        {mode === 'normal' && (
+        {!loading && !error && (
           <div>
-            {filteredTenants.length === 0 ? (
+            {tenants.length === 0 && query ? (
               <p className="text-mute text-center py-[30px]">Tidak ada hasil.</p>
             ) : (
-              filteredTenants.map((x) => (
-                <Card key={x.id} onClick={() => navigate(`/penghuni/${x.id}`)}>
-                  <div className="flex justify-between items-center">
-                    <div className="flex gap-[10px] items-center">
-                      <Avatar name={x.name} />
-                      <div>
-                        <div className="font-bold text-ink">{x.name.split(' ')[0]}</div>
-                        <div className="text-[13px] text-ink font-semibold">
-                          Kamar {x.room}
+              tenants.map((x) => {
+                const roomText = x.currentRoom ? `Kamar ${x.currentRoom.roomNumber}` : 'Tidak ada kamar';
+                const statusBadge = x.status === 'AKTIF' ? 'Aktif' : 'Keluar';
+
+                return (
+                  <Card key={x.id} onClick={() => navigate(`/penghuni/${x.id}`)}>
+                    <div className="flex justify-between items-center">
+                      <div className="flex gap-[10px] items-center">
+                        <Avatar name={x.name} />
+                        <div>
+                          <div className="font-bold text-ink">{(x.name || '').split(' ')[0]}</div>
+                          <div className="text-[13px] text-ink font-semibold">
+                            {roomText}
+                          </div>
+                          <div className="text-[13px] text-mute">{x.phone}</div>
                         </div>
-                        <div className="text-[13px] text-mute">{x.hp}</div>
                       </div>
+                      <Badge status={statusBadge} />
                     </div>
-                    <Badge status={x.st} />
-                  </div>
-                </Card>
-              ))
+                  </Card>
+                );
+              })
             )}
           </div>
         )}

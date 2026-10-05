@@ -1,34 +1,72 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useApp, rp } from '../context/AppContext';
 import Header from '../components/Header';
 import { Button } from '../components/UIComponents';
+import { SkeletonLoader } from '../components/StateComponents';
+import { getRooms } from '../api/rooms';
+import { createTenant } from '../api/tenants';
 
 export default function TenantForm() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { rooms, addTenant } = useApp();
-
-  const preselectedRoom = location.state?.room || (rooms[0] ? rooms[0].n : '01');
+  const { activePropertyId, showToast } = useApp();
 
   const [step, setStep] = useState(1);
+  const [rooms, setRooms] = useState([]);
+  const [loadingRooms, setLoadingRooms] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+
   const [draft, setDraft] = useState({
     name: '',
     hp: '',
     addr: '',
     job: '',
-    in: '2026-10-04',
-    room: preselectedRoom,
+    in: new Date().toISOString().split('T')[0],
+    roomId: '',
     ktp: '',
   });
 
   const [err, setErr] = useState('');
 
-  const handleNext1 = () => {
-    if (!draft.ktp) {
-      setErr('Foto KTP wajib diunggah.');
+  useEffect(() => {
+    if (!activePropertyId) {
+      navigate('/pilih-rumah', { replace: true });
       return;
     }
+
+    (async () => {
+      setLoadingRooms(true);
+      try {
+        const fetchedRooms = await getRooms(activePropertyId);
+        setRooms(fetchedRooms);
+
+        // Pre-select kamar jika datang dari RoomDetail
+        const stateRoomId = location.state?.roomId;
+        const stateRoomNum = location.state?.room;
+
+        let selectedId = '';
+        if (stateRoomId && fetchedRooms.some((r) => r.id === stateRoomId)) {
+          selectedId = stateRoomId;
+        } else if (stateRoomNum) {
+          const match = fetchedRooms.find((r) => r.roomNumber === stateRoomNum);
+          if (match) selectedId = match.id;
+        }
+
+        if (!selectedId && fetchedRooms.length > 0) {
+          selectedId = fetchedRooms[0].id;
+        }
+
+        setDraft((prev) => ({ ...prev, roomId: selectedId }));
+      } catch (e) {
+        setErr('Gagal memuat daftar kamar.');
+      } finally {
+        setLoadingRooms(false);
+      }
+    })();
+  }, [activePropertyId, location.state, navigate]);
+
+  const handleNext1 = () => {
     if (!draft.name.trim()) {
       setErr('Nama wajib diisi.');
       return;
@@ -50,9 +88,37 @@ export default function TenantForm() {
     setStep(2);
   };
 
-  const handleSave = () => {
-    addTenant(draft);
-    navigate('/penghuni');
+  const handleSave = async () => {
+    if (!draft.roomId) {
+      setErr('Silakan pilih kamar.');
+      return;
+    }
+    if (!draft.in) {
+      setErr('Tanggal masuk wajib diisi.');
+      return;
+    }
+
+    setSubmitting(true);
+    setErr('');
+
+    try {
+      await createTenant(activePropertyId, {
+        name: draft.name.trim(),
+        phone: draft.hp.trim(),
+        originAddress: draft.addr.trim(),
+        occupation: draft.job.trim(),
+        moveInDate: draft.in,
+        roomId: draft.roomId,
+        ktpPhoto: draft.ktp || null,
+      });
+
+      showToast('Penghuni disimpan');
+      navigate('/penghuni');
+    } catch (error) {
+      setErr(error.message || 'Gagal menyimpan penghuni.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -71,7 +137,7 @@ export default function TenantForm() {
         {step === 1 ? (
           <div>
             <label className={`block border-2 dashed rounded-[16px] p-[26px] text-center font-semibold cursor-pointer mb-[14px] ${draft.ktp ? 'border-ok text-ok border-solid' : 'border-line text-mute'}`}>
-              {draft.ktp ? `✓ ${draft.ktp}` : '📷 Tambah foto KTP'}
+              {draft.ktp ? `✓ ${draft.ktp}` : '📷 Tambah foto KTP (opsional)'}
               <input
                 type="file"
                 accept="image/*"
@@ -135,42 +201,54 @@ export default function TenantForm() {
           </div>
         ) : (
           <div>
-            <div className="mb-[14px]">
-              <label className="block text-[13px] font-semibold mb-[6px] text-ink">
-                Tanggal masuk
-              </label>
-              <input
-                type="date"
-                className="w-full border border-line bg-card rounded-[12px] p-[12px_14px] outline-none focus:outline-2 focus:outline-brand"
-                value={draft.in}
-                onChange={(e) => setDraft({ ...draft, in: e.target.value })}
-              />
-            </div>
+            {loadingRooms ? (
+              <div className="py-4">
+                <SkeletonLoader />
+              </div>
+            ) : (
+              <>
+                <div className="mb-[14px]">
+                  <label className="block text-[13px] font-semibold mb-[6px] text-ink">
+                    Tanggal masuk
+                  </label>
+                  <input
+                    type="date"
+                    className="w-full border border-line bg-card rounded-[12px] p-[12px_14px] outline-none focus:outline-2 focus:outline-brand"
+                    value={draft.in}
+                    onChange={(e) => setDraft({ ...draft, in: e.target.value })}
+                  />
+                </div>
 
-            <div className="mb-[14px]">
-              <label className="block text-[13px] font-semibold mb-[6px] text-ink">
-                Pilih kamar
-              </label>
-              <select
-                className="w-full border border-line bg-card rounded-[12px] p-[12px_14px] outline-none focus:outline-2 focus:outline-brand"
-                value={draft.room}
-                onChange={(e) => setDraft({ ...draft, room: e.target.value })}
-              >
-                {rooms.map((r) => (
-                  <option key={r.n} value={r.n}>
-                    Kamar {r.n} — {rp(r.p)}
-                  </option>
-                ))}
-              </select>
-              <p className="text-[13px] text-mute mt-[6px]">
-                Jika kamar sudah berpenghuni, tagihan tetap satu untuk kamar.
-              </p>
-            </div>
+                <div className="mb-[14px]">
+                  <label className="block text-[13px] font-semibold mb-[6px] text-ink">
+                    Pilih kamar
+                  </label>
+                  <select
+                    className="w-full border border-line bg-card rounded-[12px] p-[12px_14px] outline-none focus:outline-2 focus:outline-brand"
+                    value={draft.roomId}
+                    onChange={(e) => setDraft({ ...draft, roomId: e.target.value })}
+                  >
+                    {rooms.map((r) => (
+                      <option key={r.id} value={r.id}>
+                        Kamar {r.roomNumber} — {rp(r.price)}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-[13px] text-mute mt-[6px]">
+                    Jika kamar sudah berpenghuni, tagihan tetap satu untuk kamar.
+                  </p>
+                </div>
 
-            <Button onClick={handleSave}>Simpan Penghuni</Button>
-            <Button variant="ghost" onClick={() => setStep(1)}>
-              Kembali
-            </Button>
+                {err && <div className="text-bad text-[13px] mb-2">{err}</div>}
+
+                <Button onClick={handleSave} disabled={submitting}>
+                  {submitting ? 'Menyimpan…' : 'Simpan Penghuni'}
+                </Button>
+                <Button variant="ghost" onClick={() => setStep(1)} disabled={submitting}>
+                  Kembali
+                </Button>
+              </>
+            )}
           </div>
         )}
       </div>
