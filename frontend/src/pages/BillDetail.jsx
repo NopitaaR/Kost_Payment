@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useApp, rp, fd, paid, left, st } from '../context/AppContext';
 import Header from '../components/Header';
@@ -7,9 +7,14 @@ import { Card, Badge, Button } from '../components/UIComponents';
 export default function BillDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { bills, deletePayment, getTenantNameByRoom } = useApp();
+  const { bills, deletePayment, getTenantNameByRoom, activePropertyId, fetchBillDetail } = useApp();
 
   const billId = Number(id);
+  useEffect(() => {
+    if (activePropertyId && billId) {
+      fetchBillDetail(activePropertyId, billId);
+    }
+  }, [activePropertyId, billId, fetchBillDetail]);
   const bill = bills.find((b) => b.id === billId);
 
   if (!bill) {
@@ -103,3 +108,4 @@ export default function BillDetail() {
     </div>
   );
 }
+

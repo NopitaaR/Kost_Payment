@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import * as authApi from '../api/auth';
 import { getToken, setOnSessionExpired } from '../api/client';
+import * as billsApi from '../api/bills';
 
 const AppContext = createContext();
 
@@ -27,21 +28,6 @@ const INITIAL_TENANTS = [
   { id: 6, name: 'Joko', room: '02', hp: '0811-2233-4455', addr: 'Lubuk Pakam', job: 'Karyawan', in: '2026-01-20', st: 'Keluar', out: '2026-06-30', ktp: 'ktp-joko.jpg' },
 ];
 
-const INITIAL_BILLS = [
-  { id: 1, room: '01', amt: 800000, per: '20 Sep – 20 Okt 2026', due: '2026-10-20', pay: [] },
-  { id: 2, room: '03', amt: 1000000, per: '25 Sep – 25 Okt 2026', due: '2026-10-25', pay: [{ d: '2026-10-02', amt: 600000, m: 'Transfer' }] },
-  { id: 3, room: '04', amt: 700000, per: '28 Agu – 28 Sep 2026', due: '2026-09-28', pay: [] },
-  { id: 4, room: '05', amt: 750000, per: '1 Sep – 1 Okt 2026', due: '2026-10-01', pay: [{ d: '2026-09-30', amt: 750000, m: 'Cash' }] },
-  { id: 5, room: '01', amt: 800000, per: '20 Agu – 20 Sep 2026', due: '2026-09-20', pay: [{ d: '2026-09-18', amt: 800000, m: 'Cash' }] },
-  { id: 6, room: '03', amt: 1000000, per: '25 Agu – 25 Sep 2026', due: '2026-09-25', pay: [{ d: '2026-09-24', amt: 400000, m: 'Transfer' }, { d: '2026-09-25', amt: 600000, m: 'Transfer' }] },
-];
-
-const INITIAL_OWNER = {
-  name: 'Pemilik Kost',
-  email: 'pemilik@kost.id',
-  hp: '0812-0000-1234',
-};
-
 export const TODAY = new Date('2026-10-04');
 
 export const rp = (n) => 'Rp' + (Number(n) || 0).toLocaleString('id-ID');
@@ -51,17 +37,40 @@ export const fd = (i) => {
   return new Date(i).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
 };
 
-export const paid = (b) => (b.pay || []).reduce((a, p) => a + p.amt, 0);
-export const left = (b) => b.amt - paid(b);
+export const paid = (b) => {
+  if (b.totalPaid !== undefined) return b.totalPaid;
+  return (b.pay || []).reduce((a, p) => a + (p.amt || 0), 0);
+};
+
+export const left = (b) => {
+  if (b.remaining !== undefined) return b.remaining;
+  return (b.amt || 0) - paid(b);
+};
+
 export const st = (b) => {
-  if (paid(b) >= b.amt) return 'LUNAS';
-  if (new Date(b.due) < TODAY) return 'TERLAMBAT';
+  if (b.status !== undefined) return b.status;
+  if (paid(b) >= (b.amt || 0)) return 'LUNAS';
+  if (new Date((b.due || 0)) < TODAY) return 'TERLAMBAT';
   if (paid(b) > 0) return 'SEBAGIAN';
   return 'BELUM_BAYAR';
 };
 
 export const LB = { LUNAS: 'Lunas', SEBAGIAN: 'Sebagian', BELUM_BAYAR: 'Belum bayar', TERLAMBAT: 'Terlambat' };
 export const CL = { LUNAS: 'ok', SEBAGIAN: 'warn', BELUM_BAYAR: 'gray', TERLAMBAT: 'bad' };
+
+// Format period from two date strings (YYYY-MM-DD) to "DD MMM YYYY – DD MMM YYYY"
+// Example: "2026-09-20" and "2026-10-20" => "20 Sep 2026 – 20 Oct 2026"
+export const formatPeriod = (startDateStr, endDateStr) => {
+  const start = new Date(startDateStr);
+  const end = new Date(endDateStr);
+  const formatDate = (date) => {
+    const day = date.getDate().toString().padStart(2, '0');
+    const month = date.toLocaleString('id-ID', { month: 'short' });
+    const year = date.getFullYear();
+    return `${day} ${month} ${year}`;
+  };
+  return `${formatDate(start)} – ${formatDate(end)}`;
+};
 
 export function AppProvider({ children }) {
   // ===== AUTHENTICATION (Phase 3A) =====
@@ -120,7 +129,7 @@ export function AppProvider({ children }) {
   const [houses, setHouses] = useState(INITIAL_HOUSES);
   const [rooms, setRooms] = useState(INITIAL_ROOMS);
   const [tenants, setTenants] = useState(INITIAL_TENANTS);
-  const [bills, setBills] = useState(INITIAL_BILLS);
+  const [bills, setBills] = useState([]);
   const [owner, setOwner] = useState(INITIAL_OWNER);
 
   const login = async (email, password) => {
@@ -336,6 +345,67 @@ export function AppProvider({ children }) {
     showToast('Nama rumah disimpan');
   };
 
+  // Fetch bills dari API berdasarkan activePropertyId
+  const fetchBills = async () => {
+    if (!activePropertyId) {
+      setBills([]);
+      return;
+    }
+    try {
+      setMode('loading');
+      const data = await billsApi.getBills(activePropertyId);
+      // Backend returns { success: true, data: [...] }
+      if (data && data.success) {
+        // Transform API bill objects to match expected shape for UI components
+        const transformed = data.data.map((bill) => ({
+          ...bill,
+          // UI expects room as string (room number)
+          room: bill.room ? bill.room.roomNumber : null,
+          // UI expects amt as number
+          amt: bill.amount,
+          // UI expects due as date string (YYYY-MM-DD)
+          due: bill.dueDate,
+          // UI expects perio as formatted string like "20 Sep – 20 Okt 2026"
+          per: bill.periodStart && bill.periodEnd
+            ? formatPeriod(bill.periodStart, bill.periodEnd)
+            : null,
+          // Keep totalPaid, remaining, status for helper functions
+          // Note: pay array is not included in list; we leave it empty.
+          // Helper functions will use totalPaid and remaining if present.
+          pay: [],
+        }));
+        setBills(transformed);
+        setMode('normal');
+      } else {
+        setBills([]);
+        setMode('error');
+      }
+    } catch (err) {
+      console.error('Gagal mengambil tagihan:', err);
+      setBills([]);
+      setMode('error');
+    }
+  };
+   const fetchBillDetail = async (propertyId, billId) => {
+     if (!propertyId || !billId) return;
+     try {
+       const data = await billsApi.getBill(propertyId, billId);
+       if (data && data.success) {
+         setBills(prev => prev.map(b => b.id === billId ? data.data : b));
+       }
+     } catch (err) {
+       console.error('Gagal mengambil detail tagihan:', err);
+     }
+   };
+
+
+  // Fetch bills ketika activePropertyId berubah atau user login
+  useEffect(() => {
+    if (isLoggedIn) {
+      fetchBills();
+    }
+  }, [activePropertyId, isLoggedIn]);
+
   return (
     <AppContext.Provider
       value={{
@@ -353,12 +423,17 @@ export function AppProvider({ children }) {
         houses,
         setHouses,
         rooms,
+        setRooms,
         tenants,
+        setTenants,
         bills,
+        setBills,
         owner,
+        setOwner,
         mode,
         setMode,
         sheetContent,
+        setSheetContent,
         openSheet,
         closeSheet,
         toastMsg,
@@ -377,6 +452,7 @@ export function AppProvider({ children }) {
         deletePayment,
         updateOwner,
         updateHouseName,
+         fetchBillDetail,
       }}
     >
       {children}
