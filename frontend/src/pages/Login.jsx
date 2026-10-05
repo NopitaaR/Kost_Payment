@@ -4,13 +4,14 @@ import { useApp } from '../context/AppContext';
 
 export default function Login() {
   const navigate = useNavigate();
-  const { showToast } = useApp();
+  const { login, authLoading, authError, showToast } = useApp();
   const [email, setEmail] = useState('pemilik@kost.id');
   const [password, setPassword] = useState('rahasia123');
 
-  const handleLogin = (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
-    navigate('/pilih-rumah');
+    const ok = await login(email, password);
+    if (ok) navigate('/pilih-rumah');
   };
 
   return (
@@ -48,13 +49,17 @@ export default function Login() {
             onChange={(e) => setPassword(e.target.value)}
             autoComplete="current-password"
           />
+          {authError && (
+            <p className="text-bad text-[13px] mt-[6px]">{authError}</p>
+          )}
         </div>
 
         <button
           type="submit"
-          className="block w-full border-0 rounded-[14px] p-[14px] font-bold bg-brand text-on-brand cursor-pointer mt-[10px] text-center text-[15px]"
+          disabled={authLoading}
+          className="block w-full border-0 rounded-[14px] p-[14px] font-bold bg-brand text-on-brand cursor-pointer mt-[10px] text-center text-[15px] disabled:opacity-60"
         >
-          Masuk
+          {authLoading ? 'Memproses…' : 'Masuk'}
         </button>
       </form>
 

@@ -6,7 +6,7 @@ import { Card, Button } from '../components/UIComponents';
 
 export default function Settings() {
   const navigate = useNavigate();
-  const { owner, houses, openSheet, closeSheet, confirmDialog, setIsLoggedIn } = useApp();
+  const { owner, houses, openSheet, closeSheet, confirmDialog, logout } = useApp();
 
   const handleInstallApp = () => {
     openSheet(
@@ -41,7 +41,7 @@ export default function Settings() {
       'Kamu perlu login lagi untuk membuka data kost.',
       'Ya, keluar',
       () => {
-        setIsLoggedIn(false);
+        logout();
         navigate('/login');
       }
     );

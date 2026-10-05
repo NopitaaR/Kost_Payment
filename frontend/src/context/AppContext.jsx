@@ -1,4 +1,6 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import * as authApi from '../api/auth';
+import { getToken, setOnSessionExpired } from '../api/client';
 
 const AppContext = createContext();
 
@@ -62,13 +64,83 @@ export const LB = { LUNAS: 'Lunas', SEBAGIAN: 'Sebagian', BELUM_BAYAR: 'Belum ba
 export const CL = { LUNAS: 'ok', SEBAGIAN: 'warn', BELUM_BAYAR: 'gray', TERLAMBAT: 'bad' };
 
 export function AppProvider({ children }) {
-  const [isLoggedIn, setIsLoggedIn] = useState(true);
+  // ===== AUTHENTICATION (Phase 3A) =====
+  const [user, setUser] = useState(null);
+  const [authReady, setAuthReady] = useState(false);
+  const [authLoading, setAuthLoading] = useState(false);
+  const [authError, setAuthError] = useState('');
+  const [activePropertyId, setActivePropertyId] = useState(null);
+  const isLoggedIn = !!user;
+
+  // Sesi hangus (401/403 dari API) → bersihkan state user.
+  useEffect(() => {
+    setOnSessionExpired(() => setUser(null));
+    return () => setOnSessionExpired(null);
+  }, []);
+
+  // Bootstrap: validasi token tersimpan saat aplikasi dibuka / browser di-refresh.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (!getToken()) {
+        if (!cancelled) setAuthReady(true);
+        return;
+      }
+      try {
+        const me = await authApi.getMe();
+        if (!cancelled) {
+          setUser(me);
+          if (me) setOwner({ name: me.name, email: me.email, hp: me.phone || '' });
+        }
+      } catch (err) {
+        // Token invalid/expired. Sesi token sudah dibersihkan oleh API client.
+        if (!cancelled) setUser(null);
+      } finally {
+        if (!cancelled) setAuthReady(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // ===== END AUTHENTICATION =====
+
   const [selectedHouse, setSelectedHouse] = useState('Rumah 1');
   const [houses, setHouses] = useState(INITIAL_HOUSES);
   const [rooms, setRooms] = useState(INITIAL_ROOMS);
   const [tenants, setTenants] = useState(INITIAL_TENANTS);
   const [bills, setBills] = useState(INITIAL_BILLS);
   const [owner, setOwner] = useState(INITIAL_OWNER);
+
+  const login = async (email, password) => {
+    setAuthLoading(true);
+    setAuthError('');
+    try {
+      const result = await authApi.login(email, password);
+      setUser(result.user);
+      if (result.user) {
+        setOwner({
+          name: result.user.name,
+          email: result.user.email,
+          hp: result.user.phone || '',
+        });
+      }
+      return true;
+    } catch (err) {
+      setAuthError(err.message || 'Login gagal.');
+      return false;
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  const logout = () => {
+    authApi.logout();
+    setUser(null);
+    setSelectedHouse(null);
+    setActivePropertyId(null);
+  };
 
   // Prototype UI Testing State: 'normal', 'empty', 'loading', 'error'
   const [mode, setMode] = useState('normal');
@@ -258,7 +330,14 @@ export function AppProvider({ children }) {
     <AppContext.Provider
       value={{
         isLoggedIn,
-        setIsLoggedIn,
+        user,
+        authReady,
+        authLoading,
+        authError,
+        login,
+        logout,
+        activePropertyId,
+        setActivePropertyId,
         selectedHouse,
         setSelectedHouse,
         houses,
