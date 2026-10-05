@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useApp, rp, left } from '../context/AppContext';
+import { createPayment } from '../api/payments';
 import Header from '../components/Header';
 import { Card, Button } from '../components/UIComponents';
 
 export default function PaymentForm() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { bills, savePayment, getTenantNameByRoom } = useApp();
+  const { bills, savePayment, getTenantNameByRoom, activePropertyId, fetchBillDetail } = useApp();
 
   const billId = Number(id);
   const bill = bills.find((b) => b.id === billId);
@@ -155,3 +156,4 @@ export default function PaymentForm() {
     </div>
   );
 }
+
