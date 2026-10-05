@@ -2,6 +2,9 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import * as authApi from '../api/auth';
 import { getToken, setOnSessionExpired } from '../api/client';
 import * as billsApi from '../api/bills';
+import * as propertiesApi from '../api/properties';
+import * as roomsApi from '../api/rooms';
+import * as tenantsApi from '../api/tenants';
 
 const AppContext = createContext();
 
@@ -387,77 +390,182 @@ export function AppProvider({ children }) {
     }
   };
    const fetchBillDetail = async (propertyId, billId) => {
-     if (!propertyId || !billId) return;
+      if (!propertyId || !billId) return;
+      try {
+        const data = await billsApi.getBill(propertyId, billId);
+        if (data && data.success) {
+          setBills(prev => prev.map(b => b.id === billId ? data.data : b));
+        }
+      } catch (err) {
+        console.error('Gagal mengambil detail tagihan:', err);
+      }
+    };
+
+   // Fetch houses (properties) dari API
+   const fetchHouses = async () => {
      try {
-       const data = await billsApi.getBill(propertyId, billId);
+       setMode('loading');
+       const data = await propertiesApi.getProperties();
+       // Backend returns { success: true, data: [...] }
        if (data && data.success) {
-         setBills(prev => prev.map(b => b.id === billId ? data.data : b));
+         // Transform API property objects to match expected shape for houses state
+         // API: [{ id, name, totalRooms, filledRooms, emptyRooms, activeTenants }]
+         // State expects: [{ n: name, k: totalRooms, t: activeTenants }]
+         const transformed = data.data.map((property) => ({
+           n: property.name,
+           k: property.totalRooms,
+           t: property.activeTenants,
+           // Store additional properties for dashboard use
+           _id: property.id,
+           _totalRooms: property.totalRooms,
+           _filledRooms: property.filledRooms,
+           _emptyRooms: property.emptyRooms,
+           _activeTenants: property.activeTenants,
+         }));
+         setHouses(transformed);
+         setMode('normal');
+       } else {
+         setHouses(INITIAL_HOUSES);
+         setMode('error');
        }
      } catch (err) {
-       console.error('Gagal mengambil detail tagihan:', err);
+       console.error('Gagal mengambil daftar rumah:', err);
+       setHouses(INITIAL_HOUSES);
+       setMode('error');
      }
    };
 
+   // Fetch rooms dari API berdasarkan activePropertyId
+   const fetchRooms = async () => {
+     if (!activePropertyId) {
+       setRooms(INITIAL_ROOMS);
+       return;
+     }
+     try {
+       setMode('loading');
+       const data = await roomsApi.getRooms(activePropertyId);
+       if (data && data.success !== false) { // API returns array directly or {success, data}
+         // API returns array of rooms: [{ id, roomNumber, price, notes, tenant }]
+         // Transform to match expected shape for rooms state: [{ n: roomNumber, p: price, note: notes }]
+         const transformed = data.map((room) => ({
+           n: room.roomNumber,
+           p: room.price,
+           note: room.notes || '',
+           // Store additional data for reference
+           _id: room.id,
+           _tenant: room.tenant, // Active tenant if any
+         }));
+         setRooms(transformed);
+         setMode('normal');
+       } else {
+         setRooms(INITIAL_ROOMS);
+         setMode('normal'); // Still normal mode even if API fails, use initial data
+       }
+     } catch (err) {
+       console.error('Gagal mengambil daftar kamar:', err);
+       setRooms(INITIAL_ROOMS);
+       setMode('normal'); // Still normal mode even if API fails, use initial data
+     }
+   };
 
-  // Fetch bills ketika activePropertyId berubah atau user login
-  useEffect(() => {
-    if (isLoggedIn) {
-      fetchBills();
-    }
-  }, [activePropertyId, isLoggedIn]);
+   // Fetch tenants dari API berdasarkan activePropertyId
+   const fetchTenants = async () => {
+     if (!activePropertyId) {
+       setTenants(INITIAL_TENANTS);
+       return;
+     }
+     try {
+       setMode('loading');
+       const data = await tenantsApi.getTenants(activePropertyId);
+       if (data && data.success !== false) { // API returns array directly or {success, data}
+         // API returns array of tenants: [{ id, name, phone, originAddress, occupation, moveInDate, room, ktpPhoto, notes, status }]
+         // Transform to match expected shape for tenants state: [{ id, name, room, hp, addr, job, in, st, ktp }]
+         const transformed = data.map((tenant) => ({
+           id: tenant.id,
+           name: tenant.name,
+           room: tenant.room ? tenant.room.roomNumber : null, // Assuming room is an object with roomNumber
+           hp: tenant.phone,
+           addr: tenant.originAddress,
+           job: tenant.occupation,
+           in: tenant.moveInDate,
+           st: tenant.status || 'Aktif', // Default to Aktif if not provided
+           ktp: tenant.ktpPhoto || `ktp-${tenant.id.toLowerCase()}.jpg`, // Fallback if no photo
+         }));
+         setTenants(transformed);
+         setMode('normal');
+       } else {
+         setTenants(INITIAL_TENANTS);
+         setMode('normal'); // Still normal mode even if API fails, use initial data
+       }
+     } catch (err) {
+       console.error('Gagal mengambil daftar penghuni:', err);
+       setTenants(INITIAL_TENANTS);
+       setMode('normal'); // Still normal mode even if API fails, use initial data
+     }
+   };
 
-  return (
-    <AppContext.Provider
-      value={{
-        isLoggedIn,
-        user,
-        authReady,
-        authLoading,
-        authError,
-        login,
-        logout,
-        activePropertyId,
-        setActivePropertyId,
-        selectedHouse,
-        setSelectedHouse,
-        houses,
-        setHouses,
-        rooms,
-        setRooms,
-        tenants,
-        setTenants,
-        bills,
-        setBills,
-        owner,
-        setOwner,
-        mode,
-        setMode,
-        sheetContent,
-        setSheetContent,
-        openSheet,
-        closeSheet,
-        toastMsg,
-        toastVisible,
-        showToast,
-        confirmDialog,
-        getActiveTenantsByRoom,
-        getTenantNameByRoom,
-        getUnpaidBills,
-        saveRoom,
-        deleteRoom,
-        addTenant,
-        moveTenant,
-        exitTenant,
-        savePayment,
-        deletePayment,
-        updateOwner,
-        updateHouseName,
-         fetchBillDetail,
-      }}
-    >
-      {children}
-    </AppContext.Provider>
-  );
-}
+   // Fetch bills, houses, rooms, dan tenants ketika activePropertyId berubah atau user login
+   useEffect(() => {
+     if (isLoggedIn) {
+       fetchHouses();
+       fetchBills();
+       fetchRooms();
+       fetchTenants();
+     }
+   }, [activePropertyId, isLoggedIn]);
+
+   return (
+     <AppContext.Provider
+       value={{
+         isLoggedIn,
+         user,
+         authReady,
+         authLoading,
+         authError,
+         login,
+         logout,
+         activePropertyId,
+         setActivePropertyId,
+         selectedHouse,
+         setSelectedHouse,
+         houses,
+         setHouses,
+         rooms,
+         setRooms,
+         tenants,
+         setTenants,
+         bills,
+         setBills,
+         owner,
+         setOwner,
+         mode,
+         setMode,
+         sheetContent,
+         setSheetContent,
+         openSheet,
+         closeSheet,
+         toastMsg,
+         toastVisible,
+         showToast,
+         confirmDialog,
+         getActiveTenantsByRoom,
+         getTenantNameByRoom,
+         getUnpaidBills,
+         saveRoom,
+         deleteRoom,
+         addTenant,
+         moveTenant,
+         exitTenant,
+         savePayment,
+         deletePayment,
+         updateOwner,
+         updateHouseName,
+          fetchBillDetail,
+       }}
+     >
+       {children}
+     </AppContext.Provider>
+   );
+ }
 
 export const useApp = () => useContext(AppContext);
