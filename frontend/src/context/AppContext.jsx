@@ -69,7 +69,17 @@ export function AppProvider({ children }) {
   const [authReady, setAuthReady] = useState(false);
   const [authLoading, setAuthLoading] = useState(false);
   const [authError, setAuthError] = useState('');
-  const [activePropertyId, setActivePropertyId] = useState(null);
+  const [activePropertyId, _setActivePropertyId] = useState(
+    () => localStorage.getItem('kost.activePropertyId') || null
+  );
+  const setActivePropertyId = (id) => {
+    _setActivePropertyId(id);
+    if (id) {
+      localStorage.setItem('kost.activePropertyId', id);
+    } else {
+      localStorage.removeItem('kost.activePropertyId');
+    }
+  };
   const isLoggedIn = !!user;
 
   // Sesi hangus (401/403 dari API) → bersihkan state user.
