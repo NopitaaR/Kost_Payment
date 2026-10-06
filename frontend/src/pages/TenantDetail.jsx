@@ -5,7 +5,14 @@ import Header from '../components/Header';
 import { Card, Badge, Avatar, Button } from '../components/UIComponents';
 import { SkeletonLoader, ErrorState } from '../components/StateComponents';
 import { getRooms } from '../api/rooms';
-import { getTenant, updateTenant, moveTenant as moveTenantApi, exitTenant as exitTenantApi } from '../api/tenants';
+import {
+  getTenant,
+  updateTenant,
+  moveTenant as moveTenantApi,
+  exitTenant as exitTenantApi,
+  uploadTenantKtp,
+  getTenantKtpBlob,
+} from '../api/tenants';
 
 export default function TenantDetail() {
   const { id } = useParams();
@@ -63,21 +70,16 @@ export default function TenantDetail() {
 
   const handleShowKtp = () => {
     openSheet(
-      <div>
-        <h3 className="text-[18px] font-bold mb-[6px]">Foto KTP</h3>
-        <div className="border-2 dashed border-line rounded-[16px] p-[50px_20px] text-center text-mute font-semibold">
-          🪪 Pratinjau KTP
-          <br />
-          <span className="text-[13px] text-mute font-normal block mt-2">
-            {tenant?.ktpPhoto
-              ? `Nama berkas: ${tenant.ktpPhoto}`
-              : 'Foto KTP belum diunggah.'}
-          </span>
-        </div>
-        <Button className="mt-[14px]" onClick={closeSheet}>
-          Tutup
-        </Button>
-      </div>
+      <KtpViewer
+        propertyId={activePropertyId}
+        tenantId={tenant?.id}
+        initialKtpPhoto={tenant?.ktpPhoto}
+        onClose={closeSheet}
+        onUpdated={(newKtp) => {
+          setTenant((prev) => (prev ? { ...prev, ktpPhoto: newKtp } : prev));
+          showToast('Foto KTP berhasil diperbarui');
+        }}
+      />
     );
   };
 
@@ -442,6 +444,113 @@ export default function TenantDetail() {
             </Button>
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+function KtpViewer({ propertyId, tenantId, initialKtpPhoto, onClose, onUpdated }) {
+  const [blobUrl, setBlobUrl] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState('');
+  const [ktpPhoto, setKtpPhoto] = useState(initialKtpPhoto);
+
+  useEffect(() => {
+    let active = true;
+    let url = null;
+    if (ktpPhoto) {
+      setLoading(true);
+      setError('');
+      getTenantKtpBlob(propertyId, tenantId)
+        .then((blob) => {
+          if (!active) return;
+          url = URL.createObjectURL(blob);
+          setBlobUrl(url);
+        })
+        .catch((err) => {
+          if (!active) return;
+          setError('Gagal memuat pratinjau gambar KTP.');
+        })
+        .finally(() => {
+          if (active) setLoading(false);
+        });
+    } else {
+      setBlobUrl(null);
+    }
+    return () => {
+      active = false;
+      if (url) URL.revokeObjectURL(url);
+    };
+  }, [propertyId, tenantId, ktpPhoto]);
+
+  const handleUploadNew = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg'];
+    if (!allowedTypes.includes(file.type)) {
+      setError('Format file tidak didukung. Gunakan JPG, JPEG, atau PNG.');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setError('Ukuran file melebihi batas maksimal 5MB.');
+      return;
+    }
+
+    setUploading(true);
+    setError('');
+    try {
+      const res = await uploadTenantKtp(propertyId, tenantId, file);
+      setKtpPhoto(res.filename);
+      if (onUpdated) onUpdated(res.filename);
+    } catch (err) {
+      setError(err.message || 'Gagal mengunggah foto KTP baru.');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  return (
+    <div>
+      <h3 className="text-[18px] font-bold mb-[10px]">Foto KTP</h3>
+      {error && <div className="text-bad text-[13px] mb-2">{error}</div>}
+
+      {loading ? (
+        <div className="border border-line rounded-[16px] p-[40px_20px] text-center text-mute">
+          Memuat foto KTP...
+        </div>
+      ) : blobUrl ? (
+        <div className="border border-line rounded-[16px] overflow-hidden bg-bg mb-3 text-center">
+          <img
+            src={blobUrl}
+            alt="Foto KTP"
+            className="w-full max-h-[300px] object-contain mx-auto"
+          />
+          <div className="text-[11px] text-mute py-1 bg-card border-t border-line">
+            {ktpPhoto}
+          </div>
+        </div>
+      ) : (
+        <div className="border-2 dashed border-line rounded-[16px] p-[40px_20px] text-center text-mute font-semibold mb-3">
+          🪪 {ktpPhoto ? `Nama berkas: ${ktpPhoto}` : 'Foto KTP belum diunggah.'}
+        </div>
+      )}
+
+      <div className="space-y-2 mt-3">
+        <label className="block w-full border border-line rounded-[12px] p-[10px] text-center text-[13px] font-semibold text-brand bg-card cursor-pointer">
+          {uploading ? 'Mengunggah KTP baru...' : '📷 Unggah / Ganti Foto KTP'}
+          <input
+            type="file"
+            accept="image/jpeg,image/png,image/jpg"
+            className="hidden"
+            disabled={uploading}
+            onChange={handleUploadNew}
+          />
+        </label>
+        <Button className="w-full" onClick={onClose}>
+          Tutup
+        </Button>
       </div>
     </div>
   );

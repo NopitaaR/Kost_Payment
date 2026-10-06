@@ -5,7 +5,7 @@ import Header from '../components/Header';
 import { Button } from '../components/UIComponents';
 import { SkeletonLoader } from '../components/StateComponents';
 import { getRooms } from '../api/rooms';
-import { createTenant } from '../api/tenants';
+import { createTenant, uploadKtp } from '../api/tenants';
 
 export default function TenantForm() {
   const location = useLocation();
@@ -16,6 +16,8 @@ export default function TenantForm() {
   const [rooms, setRooms] = useState([]);
   const [loadingRooms, setLoadingRooms] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [uploadingKtp, setUploadingKtp] = useState(false);
+  const [ktpError, setKtpError] = useState('');
 
   const [draft, setDraft] = useState({
     name: '',
@@ -25,6 +27,7 @@ export default function TenantForm() {
     in: new Date().toISOString().split('T')[0],
     roomId: '',
     ktp: '',
+    ktpDisplayName: '',
   });
 
   const [err, setErr] = useState('');
@@ -88,6 +91,37 @@ export default function TenantForm() {
     setStep(2);
   };
 
+  const handleKtpChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg'];
+    if (!allowedTypes.includes(file.type)) {
+      setKtpError('Format file tidak didukung. Gunakan JPG, JPEG, atau PNG.');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setKtpError('Ukuran file melebihi batas maksimal 5MB.');
+      return;
+    }
+
+    setUploadingKtp(true);
+    setKtpError('');
+    try {
+      const res = await uploadKtp(activePropertyId, file);
+      setDraft((prev) => ({
+        ...prev,
+        ktp: res.filename,
+        ktpDisplayName: file.name,
+      }));
+      showToast('Foto KTP berhasil diunggah');
+    } catch (uploadError) {
+      setKtpError(uploadError.message || 'Gagal mengunggah foto KTP.');
+    } finally {
+      setUploadingKtp(false);
+    }
+  };
+
   const handleSave = async () => {
     if (!draft.roomId) {
       setErr('Silakan pilih kamar.');
@@ -136,19 +170,20 @@ export default function TenantForm() {
 
         {step === 1 ? (
           <div>
-            <label className={`block border-2 dashed rounded-[16px] p-[26px] text-center font-semibold cursor-pointer mb-[14px] ${draft.ktp ? 'border-ok text-ok border-solid' : 'border-line text-mute'}`}>
-              {draft.ktp ? `✓ ${draft.ktp}` : '📷 Tambah foto KTP (opsional)'}
+            <label className={`block border-2 dashed rounded-[16px] p-[26px] text-center font-semibold cursor-pointer mb-[6px] ${draft.ktp ? 'border-ok text-ok border-solid' : 'border-line text-mute'}`}>
+              {uploadingKtp
+                ? '⏳ Mengunggah foto KTP...'
+                : (draft.ktp ? `✓ ${draft.ktpDisplayName || draft.ktp}` : '📷 Tambah foto KTP (opsional)')}
               <input
                 type="file"
-                accept="image/*"
-                capture="environment"
+                accept="image/jpeg,image/png,image/jpg"
                 className="hidden"
-                onChange={(e) => {
-                  const filename = e.target.files[0]?.name || 'ktp-upload.jpg';
-                  setDraft((prev) => ({ ...prev, ktp: filename }));
-                }}
+                disabled={uploadingKtp}
+                onChange={handleKtpChange}
               />
             </label>
+            {ktpError && <div className="text-bad text-[13px] mb-[12px]">{ktpError}</div>}
+            {!ktpError && <div className="mb-[14px]"></div>}
 
             <div className="mb-[14px]">
               <label className="block text-[13px] font-semibold mb-[6px] text-ink">

@@ -35,8 +35,12 @@ async function request(path, { method = 'GET', body, params, requireAuth = true 
     });
   }
 
-  const headers = { Accept: 'application/json' };
-  if (body !== undefined) headers['Content-Type'] = 'application/json';
+  const isFormData = typeof FormData !== 'undefined' && body instanceof FormData;
+  const headers = {};
+  if (!isFormData) {
+    headers.Accept = 'application/json';
+    if (body !== undefined) headers['Content-Type'] = 'application/json';
+  }
 
   const token = getToken();
   if (token) headers.Authorization = `Bearer ${token}`;
@@ -46,7 +50,7 @@ async function request(path, { method = 'GET', body, params, requireAuth = true 
     response = await fetch(url, {
       method,
       headers,
-      body: body !== undefined ? JSON.stringify(body) : undefined,
+      body: isFormData ? body : (body !== undefined ? JSON.stringify(body) : undefined),
     });
   } catch (networkError) {
     throw new ApiError('Tidak dapat terhubung ke server. Periksa koneksi Anda.', 0, null);
@@ -76,11 +80,47 @@ async function request(path, { method = 'GET', body, params, requireAuth = true 
   return payload;
 }
 
+async function requestBlob(path, { params, requireAuth = true } = {}) {
+  const url = new URL(BASE_URL + path, window.location.origin);
+  if (params) {
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') {
+        url.searchParams.set(key, value);
+      }
+    });
+  }
+
+  const headers = {};
+  const token = getToken();
+  if (token) headers.Authorization = `Bearer ${token}`;
+
+  let response;
+  try {
+    response = await fetch(url, {
+      method: 'GET',
+      headers,
+    });
+  } catch (networkError) {
+    throw new ApiError('Tidak dapat terhubung ke server. Periksa koneksi Anda.', 0, null);
+  }
+
+  if (!response.ok) {
+    if ((response.status === 401 || response.status === 403) && requireAuth && token) {
+      clearToken();
+      if (onSessionExpired) onSessionExpired();
+    }
+    throw new ApiError(`Gagal mengambil file (${response.status}).`, response.status, null);
+  }
+
+  return await response.blob();
+}
+
 export const api = {
   get: (path, options) => request(path, { ...options, method: 'GET' }),
   post: (path, body, options) => request(path, { ...options, method: 'POST', body }),
   put: (path, body, options) => request(path, { ...options, method: 'PUT', body }),
   delete: (path, options) => request(path, { ...options, method: 'DELETE' }),
+  getBlob: (path, options) => requestBlob(path, options),
 };
 
 export default api;

@@ -1,6 +1,98 @@
 import express from 'express';
 import { PrismaClient } from '@prisma/client';
+import path from 'path';
+import fs from 'fs';
+import crypto from 'crypto';
+import { fileURLToPath } from 'url';
+import multer from 'multer';
 import { authenticateToken } from '../middleware/authMiddleware.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const UPLOAD_DIR = path.resolve(__dirname, '../../uploads/ktp');
+
+if (!fs.existsSync(UPLOAD_DIR)) {
+  fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+}
+
+function deleteOldKtpFile(filename) {
+  if (!filename) return;
+  const safeFilename = path.basename(filename);
+  const filePath = path.resolve(UPLOAD_DIR, safeFilename);
+  if (filePath.startsWith(UPLOAD_DIR) && fs.existsSync(filePath)) {
+    try {
+      fs.unlinkSync(filePath);
+    } catch (e) {
+      console.error('Gagal menghapus file KTP lama:', e.message);
+    }
+  }
+}
+
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, UPLOAD_DIR);
+  },
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    const unique = `${Date.now()}-${crypto.randomBytes(6).toString('hex')}`;
+    cb(null, `ktp-${unique}${ext}`);
+  },
+});
+
+const allowedMimes = ['image/jpeg', 'image/png', 'image/jpg'];
+const allowedExts = ['.jpg', '.jpeg', '.png'];
+
+const fileFilter = (req, file, cb) => {
+  const ext = path.extname(file.originalname).toLowerCase();
+  if (!allowedMimes.includes(file.mimetype) || !allowedExts.includes(ext)) {
+    return cb(new Error('Format file tidak didukung. Gunakan JPG, JPEG, atau PNG.'));
+  }
+  cb(null, true);
+};
+
+const upload = multer({
+  storage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB
+  fileFilter,
+});
+
+function handleKtpUpload(req, res, next) {
+  const uploadFields = upload.fields([
+    { name: 'ktp', maxCount: 1 },
+    { name: 'file', maxCount: 1 },
+  ]);
+  uploadFields(req, res, (err) => {
+    if (err instanceof multer.MulterError) {
+      if (err.code === 'LIMIT_FILE_SIZE') {
+        return res.status(400).json({
+          success: false,
+          message: 'Ukuran file melebihi batas maksimal 5MB.',
+        });
+      }
+      return res.status(400).json({
+        success: false,
+        message: err.message,
+      });
+    } else if (err) {
+      return res.status(400).json({
+        success: false,
+        message: err.message,
+      });
+    }
+    const uploadedFile =
+      (req.files && req.files.ktp && req.files.ktp[0]) ||
+      (req.files && req.files.file && req.files.file[0]);
+
+    if (!uploadedFile) {
+      return res.status(400).json({
+        success: false,
+        message: 'File KTP wajib diunggah.',
+      });
+    }
+    req.file = uploadedFile;
+    next();
+  });
+}
 
 const router = express.Router({ mergeParams: true });
 const prisma = new PrismaClient();
@@ -250,6 +342,28 @@ router.post('/', async (req, res) => {
   }
 });
 
+// POST /api/v1/properties/:propertyId/tenants/upload-ktp
+// Upload file KTP (draft / sebelum tenant dibuat)
+router.post('/upload-ktp', handleKtpUpload, async (req, res) => {
+  try {
+    return res.status(200).json({
+      success: true,
+      message: 'File KTP berhasil diunggah.',
+      data: {
+        filename: req.file.filename,
+        originalName: req.file.originalname,
+        size: req.file.size,
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: 'Gagal mengunggah file KTP.',
+      error: error.message,
+    });
+  }
+});
+
 // GET /api/v1/properties/:propertyId/tenants/:tenantId
 // Detail penghuni
 router.get('/:tenantId', async (req, res) => {
@@ -341,6 +455,106 @@ router.get('/:tenantId', async (req, res) => {
   }
 });
 
+// GET /api/v1/properties/:propertyId/tenants/:tenantId/ktp
+// Mengambil file foto KTP secara aman (hanya pemilik properti)
+router.get('/:tenantId/ktp', async (req, res) => {
+  try {
+    const { propertyId, tenantId } = req.params;
+
+    const tenant = await prisma.tenant.findUnique({
+      where: { id: tenantId },
+      include: {
+        occupancies: {
+          where: { propertyId },
+        },
+      },
+    });
+
+    if (!tenant || tenant.occupancies.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Penghuni tidak ditemukan pada rumah ini.',
+      });
+    }
+
+    if (!tenant.ktpPhoto) {
+      return res.status(404).json({
+        success: false,
+        message: 'Foto KTP belum diunggah.',
+      });
+    }
+
+    const safeFilename = path.basename(tenant.ktpPhoto);
+    const filePath = path.resolve(UPLOAD_DIR, safeFilename);
+
+    if (!filePath.startsWith(UPLOAD_DIR) || !fs.existsSync(filePath)) {
+      return res.status(404).json({
+        success: false,
+        message: 'File KTP tidak ditemukan pada server.',
+      });
+    }
+
+    return res.sendFile(filePath);
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: 'Gagal mengambil foto KTP.',
+      error: error.message,
+    });
+  }
+});
+
+// POST /api/v1/properties/:propertyId/tenants/:tenantId/ktp
+// Unggah / ganti foto KTP untuk penghuni yang sudah ada
+router.post('/:tenantId/ktp', handleKtpUpload, async (req, res) => {
+  try {
+    const { propertyId, tenantId } = req.params;
+
+    const tenant = await prisma.tenant.findUnique({
+      where: { id: tenantId },
+      include: {
+        occupancies: {
+          where: { propertyId },
+        },
+      },
+    });
+
+    if (!tenant || tenant.occupancies.length === 0) {
+      deleteOldKtpFile(req.file.filename);
+      return res.status(404).json({
+        success: false,
+        message: 'Penghuni tidak ditemukan pada rumah ini.',
+      });
+    }
+
+    // Jika sudah ada KTP lama, hapus dari disk
+    if (tenant.ktpPhoto && tenant.ktpPhoto !== req.file.filename) {
+      deleteOldKtpFile(tenant.ktpPhoto);
+    }
+
+    const updatedTenant = await prisma.tenant.update({
+      where: { id: tenantId },
+      data: { ktpPhoto: req.file.filename },
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: 'Foto KTP berhasil diperbarui.',
+      data: {
+        id: updatedTenant.id,
+        ktpPhoto: updatedTenant.ktpPhoto,
+        filename: req.file.filename,
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: 'Gagal mengunggah foto KTP.',
+      error: error.message,
+    });
+  }
+});
+
 // PUT /api/v1/properties/:propertyId/tenants/:tenantId
 // Edit data dasar penghuni
 router.put('/:tenantId', async (req, res) => {
@@ -380,6 +594,9 @@ router.put('/:tenantId', async (req, res) => {
     }
     if (ktpPhoto !== undefined) {
       updateData.ktpPhoto = ktpPhoto ? String(ktpPhoto) : null;
+      if (tenant.ktpPhoto && tenant.ktpPhoto !== updateData.ktpPhoto) {
+        deleteOldKtpFile(tenant.ktpPhoto);
+      }
     }
     if (originAddress !== undefined) {
       if (typeof originAddress !== 'string' || originAddress.trim() === '') {
