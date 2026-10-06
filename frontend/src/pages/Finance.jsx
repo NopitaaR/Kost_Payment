@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useApp, rp, fd, left, paid, st } from '../context/AppContext';
+import { getPropertyPayments } from '../api/payments';
+import { createBill, generateBills } from '../api/bills';
 import Header from '../components/Header';
 import { Card, Badge, Chip, Button } from '../components/UIComponents';
 import { SkeletonLoader, ErrorState, EmptyState } from '../components/StateComponents';
@@ -14,22 +16,103 @@ export default function Finance() {
   const navigate = useNavigate();
   const {
     bills,
+    fetchBills,
     rooms,
-    deletePayment,
     openSheet,
     closeSheet,
     getTenantNameByRoom,
-    getActiveTenantsByRoom,
+    activePropertyId,
     mode,
     setMode,
   } = useApp();
 
+  // State declarations
   const [activeTab, setActiveTab] = useState(location.state?.tab || 'unpaid'); // 'bills', 'pays', 'unpaid'
 
   // Bill Filter state
   const [billFilter, setBillFilter] = useState({ q: '', room: '', per: '', st: '' });
   // Payment Filter state
   const [payFilter, setPayFilter] = useState({ room: '', m: '', a: '', z: '' });
+
+  // Payments from API
+  const [payments, setPayments] = useState([]);
+  const [paymentsLoading, setPaymentsLoading] = useState(false);
+  const [paymentsError, setPaymentsError] = useState('');
+
+  // Generate bills state
+  const [generateLoading, setGenerateLoading] = useState(false);
+  const [generateMsg, setGenerateMsg] = useState('');
+  const [generateError, setGenerateError] = useState('');
+
+  // Manual bill creation state
+  const [manualBillOpen, setManualBillOpen] = useState(false);
+  const [manualBill, setManualBill] = useState({
+    roomId: '',
+    periodStart: '',
+    periodEnd: '',
+    dueDate: '',
+    notes: ''
+  });
+  const [manualBillError, setManualBillError] = useState('');
+  const [manualBillLoading, setManualBillLoading] = useState(false);
+
+  // Fetch payments for the active property when it changes
+  useEffect(() => {
+    if (activePropertyId) {
+      fetchPayments();
+    }
+  }, [activePropertyId]);
+
+  const fetchPayments = async () => {
+    if (!activePropertyId) return;
+    setPaymentsLoading(true);
+    setPaymentsError('');
+    try {
+      const response = await getPropertyPayments(activePropertyId);
+      if (response && response.success) {
+        setPayments(response.data || []);
+      } else {
+        setPayments([]);
+      }
+    } catch (err) {
+      console.error('Gagal mengambil daftar pembayaran:', err);
+      setPayments([]);
+      if (err.response && err.response.data && err.response.data.message) {
+        setPaymentsError(err.response.data.message);
+      } else {
+        setPaymentsError('Gagal memuat daftar pembayaran.');
+      }
+    } finally {
+      setPaymentsLoading(false);
+    }
+  };
+
+  const handleGenerateBills = async () => {
+    if (!activePropertyId) return;
+    setGenerateLoading(true);
+    setGenerateMsg('');
+    setGenerateError('');
+    try {
+      const response = await generateBills(activePropertyId);
+      if (response && response.success) {
+        const count = response.data?.generatedCount ?? 0;
+        setGenerateMsg(
+          count > 0
+            ? `${count} tagihan baru berhasil dibuat.`
+            : 'Semua tagihan sudah ada, tidak ada yang perlu dibuat.'
+        );
+        // Refetch bills agar daftar langsung diperbarui
+        await fetchBills();
+      } else {
+        setGenerateError('Gagal generate tagihan.');
+      }
+    } catch (err) {
+      console.error('Gagal generate tagihan:', err);
+      setGenerateError(err.message || 'Terjadi kesalahan saat generate tagihan.');
+    } finally {
+      setGenerateLoading(false);
+    }
+  };
 
   const periods = [...new Set(bills.map((b) => ym(b.due)))].sort().reverse();
 
@@ -62,19 +145,11 @@ export default function Finance() {
     })
     .sort((a, c) => c.due.localeCompare(a.due));
 
-  const allPayments = bills
-    .flatMap((b) => (b.pay || []).map((p, i) => ({ ...p, b, i })))
-    .filter((p) => {
-      const matchesRoom = !payFilter.room || p.b.room === payFilter.room;
-      const matchesMethod = !payFilter.m || p.m === payFilter.m;
-      const matchesFrom = !payFilter.a || p.d >= payFilter.a;
-      const matchesTo = !payFilter.z || p.d <= payFilter.z;
-      return matchesRoom && matchesMethod && matchesFrom && matchesTo;
-    })
-    .sort((a, c) => c.d.localeCompare(a.d));
-
+  // Compute unpaid bills
   const unpaidList = bills.filter((b) => st(b) !== 'LUNAS');
-  const totalUnpaid = unpaidList.reduce((acc, b) => acc + left(b), 0);
+
+  // Compute total payments amount from fetched payments
+  const totalPaymentsAmount = payments.reduce((acc, p) => acc + (p.amt || 0), 0);
 
   const openBillFilterModal = () => {
     openSheet(
@@ -248,9 +323,77 @@ export default function Finance() {
     );
   };
 
+  const openManualBillModal = () => {
+    // Reset form when opening
+    setManualBill({
+      roomId: '',
+      periodStart: '',
+      periodEnd: '',
+      dueDate: '',
+      notes: ''
+    });
+    setManualBillError('');
+    setManualBillOpen(true);
+  };
+
+  const closeManualBillModal = () => {
+    setManualBillOpen(false);
+  };
+
+  const handleManualBillChange = (field, value) => {
+    setManualBill(prev => ({
+      ...prev,
+      [field]: value,
+    }));
+  };
+
+  const handleManualBillSubmit = async (e) => {
+    e.preventDefault();
+    setManualBillError('');
+    setManualBillLoading(true);
+    try {
+      // Validate
+      if (!manualBill.roomId) {
+        setManualBillError('Kamar harus dipilih');
+        return;
+      }
+      if (!manualBill.periodStart || !manualBill.periodEnd) {
+        setManualBillError('Periode harus diisi');
+        return;
+      }
+      if (!manualBill.dueDate) {
+        setManualBillError('Tanggal jatuh tempo harus diisi');
+        return;
+      }
+
+      // Build API data — amount diambil dari harga kamar (backend snapshot)
+      const apiData = {
+        roomId: manualBill.roomId,
+        periodStart: manualBill.periodStart,
+        periodEnd: manualBill.periodEnd,
+        dueDate: manualBill.dueDate,
+        notes: manualBill.notes || undefined,
+      };
+
+      const response = await createBill(activePropertyId, apiData);
+      if (response && response.success) {
+        // Refetch bills to update the list
+        await fetchBills();
+        closeManualBillModal();
+      } else {
+        setManualBillError('Gagal membuat tagihan');
+      }
+    } catch (err) {
+      console.error('Gagal membuat tagihan manual:', err);
+      setManualBillError(err.message || 'Terjadi kesalahan');
+    } finally {
+      setManualBillLoading(false);
+    }
+  };
+
   const handleWhatsApp = (bill) => {
     const tenantName = getTenantNameByRoom(bill.room);
-    const text = `Halo ${tenantName}, mengingatkan pembayaran kost Kamar ${bill.room} sebesar ${rp(left(bill))} yang belum dibayar.\n\nTerima kasih.`;
+    const text = `Halo ${tenantName}, mengingatkan pembayaran kost Kamar ${bill.room} sebesar ${rp(left(bill))} yang belum dibayar.\\n\\nTerima kasih.`;
     window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
   };
 
@@ -259,7 +402,7 @@ export default function Finance() {
       <Header title="Keuangan" back={false} />
 
       <div className="px-[18px]">
-        <div className="flex gap-[8px] mb-[10px]">
+        <div className="flex gap-[8px] mb-[10px] flex-wrap">
           {[
             ['bills', 'Tagihan'],
             ['pays', 'Pembayaran'],
@@ -282,6 +425,32 @@ export default function Finance() {
             {/* TAGIHAN TAB */}
             {activeTab === 'bills' && (
               <div>
+                {/* Generate & Manual Bill actions */}
+                <div className="flex gap-[8px] mb-[10px] flex-wrap">
+                  <Button
+                    size="sm"
+                    onClick={handleGenerateBills}
+                    disabled={generateLoading}
+                  >
+                    {generateLoading ? 'Generating…' : '⚡ Generate Tagihan'}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={openManualBillModal}
+                  >
+                    + Tagihan Manual
+                  </Button>
+                </div>
+
+                {/* Generate feedback */}
+                {generateMsg && (
+                  <p className="text-ok text-[13px] mb-2">{generateMsg}</p>
+                )}
+                {generateError && (
+                  <p className="text-bad text-[13px] mb-2">{generateError}</p>
+                )}
+
                 <div className="flex gap-[10px] mb-[10px] items-center">
                   <input
                     placeholder="🔍 Cari kamar / nama…"
@@ -314,7 +483,7 @@ export default function Finance() {
                         </div>
                         <Badge status={st(b)} />
                       </div>
-                      {(b.pay.length > 0 || activeTab === 'unpaid') && (
+                      {(left(b) > 0 || (b.totalPaid > 0)) && (
                         <div className="flex justify-between items-center mt-2">
                           <span className="text-[13px] text-mute">Sisa</span>
                           <span className="font-bold text-ink">{rp(left(b))}</span>
@@ -331,7 +500,7 @@ export default function Finance() {
               <div>
                 <div className="flex justify-between items-center mb-[10px]">
                   <div className="text-[13px] text-mute">
-                    {allPayments.length} pembayaran · {rp(allPayments.reduce((acc, p) => acc + p.amt, 0))}
+                    {payments.length} pembayaran · {rp(totalPaymentsAmount)}
                   </div>
                   <Chip
                     label={`Filter${countActivePayFilters() ? ` (${countActivePayFilters()})` : ''}`}
@@ -340,37 +509,37 @@ export default function Finance() {
                   />
                 </div>
 
-                {allPayments.length === 0 ? (
-                  <EmptyState
-                    icon="💸"
-                    title="Belum ada pembayaran"
-                    message="Pembayaran yang dicatat akan muncul di sini."
-                  />
+                {paymentsLoading ? (
+                  <p className="text-mute text-sm mb-4">Memuat pembayaran...</p>
+                ) : paymentsError ? (
+                  <p className="text-bad text-sm mb-4">{paymentsError}</p>
                 ) : (
-                  allPayments.map((p, idx) => (
-                    <Card key={`${p.b.id}-${idx}`} flat>
-                      <div className="flex justify-between items-center">
-                        <div>
-                          <div className="font-bold text-ink">
-                            Kamar {p.b.room} · {getTenantNameByRoom(p.b.room)}
+                  payments.length === 0 ? (
+                    <EmptyState
+                      icon="💸"
+                      title="Belum ada pembayaran"
+                      message="Pembayaran yang dicatat akan muncul di sini."
+                    />
+                  ) : (
+                    payments.map((p, idx) => (
+                      <Card key={`${p.id || p.billId}-${idx}`} flat>
+                        <div className="flex justify-between items-center">
+                          <div>
+                            <div className="font-bold text-ink">
+                              Kamar {p.roomNumber ?? '-'} · {getTenantNameByRoom(p.roomNumber ?? '-')}
+                            </div>
+                            <div className="text-[13px] text-mute">
+                              {fd(p.paymentDate)} · {p.method || p.m}
+                            </div>
                           </div>
-                          <div className="text-[13px] text-mute">
-                            {fd(p.d)} · {p.m}
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
                           <div className="font-bold text-ink">{rp(p.amt)}</div>
-                          <button
-                            className="w-[42px] h-[42px] border-0 bg-transparent rounded-[12px] text-[18px] cursor-pointer flex items-center justify-center text-ink active:bg-gray-soft"
-                            aria-label="Hapus pembayaran"
-                            onClick={() => deletePayment(p.b.id, p.i)}
-                          >
-                            🗑
-                          </button>
                         </div>
-                      </div>
-                    </Card>
-                  ))
+                        {p.notes && (
+                          <div className="text-[13px] text-mute mt-1">{p.notes}</div>
+                        )}
+                      </Card>
+                    ))
+                  )
                 )}
               </div>
             )}
@@ -385,64 +554,153 @@ export default function Finance() {
                     message="Semua pembayaran sudah aman."
                   />
                 ) : (
-                  <>
-                    <Card flat className="bg-bad-soft border-transparent mb-[10px]">
-                      <div className="text-[13px] text-mute">Total belum bayar</div>
-                      <div className="text-[30px] font-extrabold text-bad tracking-tight">
-                        {rp(totalUnpaid)}
+                  unpaidList.map((b) => (
+                    <Card key={b.id} flat>
+                      <div className="flex justify-between items-center">
+                        <div>
+                          <div className="font-bold text-ink">{getTenantNameByRoom(b.room)}</div>
+                          <div className="text-[13px] text-mute">
+                            Kamar {b.room} · Jatuh tempo {fd(b.due)}
+                          </div>
+                        </div>
+                        <Badge status={st(b)} />
                       </div>
-                      <div className="text-[13px] font-bold text-ink">
-                        {unpaidList.length} tagihan
+
+                      {paid(b) > 0 && (
+                        <div className="text-[13px] text-mute mt-[6px]">
+                          Tagihan {rp(b.amt)} · Dibayar {rp(paid(b))}
+                        </div>
+                      )}
+
+                      <div className="flex justify-between items-center my-[6px]">
+                        <span className="text-[13px] text-mute">Sisa</span>
+                        <span className="font-bold text-[18px] text-ink">{rp(left(b))}</span>
+                      </div>
+
+                      <div className="flex gap-[10px]">
+                        <Button
+                          size="sm"
+                          onClick={() => navigate(`/keuangan/tagihan/${b.id}/bayar`)}>
+                          Catat Pembayaran
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="wa"
+                          onClick={() => handleWhatsApp(b)}>
+                          WhatsApp
+                        </Button>
                       </div>
                     </Card>
-
-                    {unpaidList.map((b) => (
-                      <Card key={b.id} flat>
-                        <div className="flex justify-between items-center">
-                          <div>
-                            <div className="font-bold text-ink">{getTenantNameByRoom(b.room)}</div>
-                            <div className="text-[13px] text-mute">
-                              Kamar {b.room} · Jatuh tempo {fd(b.due)}
-                            </div>
-                          </div>
-                          <Badge status={st(b)} />
-                        </div>
-
-                        {paid(b) > 0 && (
-                          <div className="text-[13px] text-mute mt-[6px]">
-                            Tagihan {rp(b.amt)} · Dibayar {rp(paid(b))}
-                          </div>
-                        )}
-
-                        <div className="flex justify-between items-center my-[6px]">
-                          <span className="text-[13px] text-mute">Sisa</span>
-                          <span className="font-bold text-[18px] text-ink">{rp(left(b))}</span>
-                        </div>
-
-                        <div className="flex gap-[10px]">
-                          <Button
-                            size="sm"
-                            onClick={() => navigate(`/keuangan/tagihan/${b.id}/bayar`)}
-                          >
-                            Catat Pembayaran
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="wa"
-                            onClick={() => handleWhatsApp(b)}
-                          >
-                            WhatsApp
-                          </Button>
-                        </div>
-                      </Card>
-                    ))}
-                  </>
+                  ))
                 )}
               </div>
             )}
           </div>
         )}
       </div>
+
+      {/* Modal Tagihan Manual */}
+      {manualBillOpen && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40">
+          <div className="w-full max-w-md bg-white rounded-t-[24px] p-[24px] max-h-[90vh] overflow-y-auto">
+            <h3 className="text-[18px] font-bold mb-[14px]">Buat Tagihan Manual</h3>
+            <form onSubmit={handleManualBillSubmit}>
+              <div className="mb-[14px]">
+                <label className="block text-[13px] font-semibold mb-[6px] text-ink">
+                  Kamar
+                </label>
+                <select
+                  className="w-full border border-line bg-card rounded-[12px] p-[12px_14px] outline-none"
+                  value={manualBill.roomId}
+                  onChange={(e) => handleManualBillChange('roomId', e.target.value)}
+                  required
+                >
+                  <option value="">Pilih kamar…</option>
+                  {rooms.map((r) => (
+                    <option key={r._id} value={r._id}>
+                      Kamar {r.n} {r.p ? `· Rp${r.p.toLocaleString('id-ID')}` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex gap-[10px] mb-[14px]">
+                <div className="flex-1">
+                  <label className="block text-[13px] font-semibold mb-[6px] text-ink">
+                    Periode mulai
+                  </label>
+                  <input
+                    type="date"
+                    className="w-full border border-line bg-card rounded-[12px] p-[12px_14px] outline-none"
+                    value={manualBill.periodStart}
+                    onChange={(e) => handleManualBillChange('periodStart', e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="flex-1">
+                  <label className="block text-[13px] font-semibold mb-[6px] text-ink">
+                    Periode selesai
+                  </label>
+                  <input
+                    type="date"
+                    className="w-full border border-line bg-card rounded-[12px] p-[12px_14px] outline-none"
+                    value={manualBill.periodEnd}
+                    onChange={(e) => handleManualBillChange('periodEnd', e.target.value)}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="mb-[14px]">
+                <label className="block text-[13px] font-semibold mb-[6px] text-ink">
+                  Jatuh tempo
+                </label>
+                <input
+                  type="date"
+                  className="w-full border border-line bg-card rounded-[12px] p-[12px_14px] outline-none"
+                  value={manualBill.dueDate}
+                  onChange={(e) => handleManualBillChange('dueDate', e.target.value)}
+                  required
+                />
+              </div>
+
+              <div className="mb-[14px]">
+                <label className="block text-[13px] font-semibold mb-[6px] text-ink">
+                  Catatan (opsional)
+                </label>
+                <input
+                  className="w-full border border-line bg-card rounded-[12px] p-[12px_14px] outline-none"
+                  value={manualBill.notes}
+                  onChange={(e) => handleManualBillChange('notes', e.target.value)}
+                  placeholder="Keterangan tagihan…"
+                />
+              </div>
+
+              <p className="text-[12px] text-mute mb-[14px]">
+                💡 Nominal tagihan diambil otomatis dari harga kamar yang sudah diatur.
+              </p>
+
+              {manualBillError && (
+                <p className="text-bad text-[13px] mb-2">{manualBillError}</p>
+              )}
+
+              <div className="flex gap-[10px]">
+                <Button
+                  variant="ghost"
+                  type="button"
+                  onClick={closeManualBillModal}
+                  disabled={manualBillLoading}
+                >
+                  Batal
+                </Button>
+                <Button type="submit" disabled={manualBillLoading}>
+                  {manualBillLoading ? 'Menyimpan…' : 'Simpan Tagihan'}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,21 +1,52 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useApp, rp, fd, paid, left, st } from '../context/AppContext';
+import { getPayments } from '../api/payments';
 import Header from '../components/Header';
 import { Card, Badge, Button } from '../components/UIComponents';
 
 export default function BillDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { bills, deletePayment, getTenantNameByRoom, activePropertyId, fetchBillDetail } = useApp();
+  const { bills, getTenantNameByRoom, activePropertyId, fetchBillDetail } = useApp();
 
   // Bill ID adalah UUID string, jangan dikonversi dengan Number().
   const billId = id;
+  const [payments, setPayments] = useState([]);
+  const [paymentsLoading, setPaymentsLoading] = useState(false);
+  const [paymentsError, setPaymentsError] = useState('');
+
   useEffect(() => {
     if (activePropertyId && billId) {
       fetchBillDetail(activePropertyId, billId);
+      fetchPayments();
     }
   }, [activePropertyId, billId, fetchBillDetail]);
+
+  const fetchPayments = async () => {
+    if (!activePropertyId || !billId) return;
+    setPaymentsLoading(true);
+    setPaymentsError('');
+    try {
+      const response = await getPayments(activePropertyId, billId);
+      if (response && response.success) {
+        setPayments(response.data || []);
+      } else {
+        setPayments([]);
+      }
+    } catch (err) {
+      console.error('Gagal mengambil riwayat pembayaran:', err);
+      setPayments([]);
+      if (err.message) {
+        setPaymentsError(err.message);
+      } else {
+        setPaymentsError('Gagal memuat riwayat pembayaran.');
+      }
+    } finally {
+      setPaymentsLoading(false);
+    }
+  };
+
   const bill = bills.find((b) => String(b.id) === String(billId));
 
   if (!bill) {
@@ -75,29 +106,29 @@ export default function BillDetail() {
         <h2 className="text-[13px] font-bold text-mute mt-[22px] mb-[8px]">
           Riwayat pembayaran
         </h2>
-        {bill.pay.length > 0 ? (
-          bill.pay.map((p, i) => (
-            <Card key={i} flat>
-              <div className="flex justify-between items-center">
-                <div>
-                  <div className="font-bold text-ink">{fd(p.d)}</div>
-                  <div className="text-[13px] text-mute">{p.m}</div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="font-bold text-ink">{rp(p.amt)}</div>
-                  <button
-                    className="w-[42px] h-[42px] border-0 bg-transparent rounded-[12px] text-[18px] cursor-pointer flex items-center justify-center text-ink active:bg-gray-soft"
-                    aria-label="Hapus pembayaran"
-                    onClick={() => deletePayment(bill.id, i)}
-                  >
-                    🗑
-                  </button>
-                </div>
-              </div>
-            </Card>
-          ))
+        {paymentsLoading ? (
+          <p className="text-mute text-sm mb-4">Memuat riwayat pembayaran...</p>
+        ) : paymentsError ? (
+          <p className="text-bad text-sm mb-4">{paymentsError}</p>
         ) : (
-          <p className="text-mute text-sm mb-4">Belum ada pembayaran.</p>
+          payments.length > 0 ? (
+            payments.map((p) => (
+              <Card key={p.id || p.paymentDate} flat>
+                <div className="flex justify-between items-center">
+                  <div>
+                    <div className="font-bold text-ink">{fd(p.paymentDate || p.d)}</div>
+                    <div className="text-[13px] text-mute">{p.method || p.m}</div>
+                  </div>
+                  <div className="font-bold text-ink">{rp(p.amt)}</div>
+                </div>
+                {p.notes && (
+                  <div className="text-[13px] text-mute mt-1">{p.notes}</div>
+                )}
+              </Card>
+            ))
+          ) : (
+            <p className="text-mute text-sm mb-4">Belum ada pembayaran.</p>
+          )
         )}
 
         {remaining > 0 && (
@@ -109,4 +140,3 @@ export default function BillDetail() {
     </div>
   );
 }
-

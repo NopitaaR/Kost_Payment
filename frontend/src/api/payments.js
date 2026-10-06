@@ -29,3 +29,23 @@ export const getPayments = (propertyId, billId) => {
     return response;
   });
 };
+
+// Get all payments for a property
+export const getPropertyPayments = (propertyId) => {
+  return api.get(`/properties/${propertyId}/payments`).then((response) => {
+    if (response && response.success) {
+      // Transform API payment objects to match expected shape for UI components
+      // The API returns payments array with amount, paymentDate, method, notes, billId, etc.
+      // UI expects objects with amt, m, d, note, and we also need bill info for display.
+      // We'll keep the original fields and add amt and m for convenience.
+      const transformed = (response.data || []).map((p) => ({
+        ...p,
+        amt: p.amount,
+        m: p.method,
+        // Keep original fields if needed
+      }));
+      return { success: true, data: transformed };
+    }
+    return response;
+  });
+};

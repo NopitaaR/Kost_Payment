@@ -103,6 +103,29 @@ export function AppProvider({ children }) {
     };
   }, []);
 
+  // Login function
+  const login = async (email, password) => {
+    setAuthLoading(true);
+    setAuthError('');
+    try {
+      const result = await authApi.login(email, password);
+      setUser(result.user || result);
+      return true;
+    } catch (err) {
+      setAuthError(err.message || 'Login gagal. Periksa email dan password.');
+      return false;
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  // Logout function
+  const logout = () => {
+    authApi.logout();
+    setUser(null);
+    setActivePropertyId(null);
+  };
+
   // ===== END AUTHENTICATION =====
 
   const [houses, setHouses] = useState([]);
@@ -534,6 +557,8 @@ export function AppProvider({ children }) {
         addTenant,
         moveTenant,
         exitTenant,
+        bills,
+        fetchBills,
         savePayment,
         deletePayment,
         updateOwner,

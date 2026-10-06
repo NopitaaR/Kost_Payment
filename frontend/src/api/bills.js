@@ -84,23 +84,16 @@ export const getBill = (propertyId, billId) => {
 };
 
 export const createBill = (propertyId, billData) => {
-  // For manual bill creation, we need to transform the bill data to API shape.
-  // The UI may expect to send { amt, due, etc } but the API expects amount, dueDate.
-  // We'll assume the billData passed in is already in the UI shape (with amt, due, etc).
-  // We'll transform to API shape.
-  const apiData = {
-    ...billData,
-    amount: billData.amt,
-    dueDate: billData.due,
-    // Note: we don't have roomId? The UI may need to provide roomId.
-    // We'll assume the billData includes roomId or propertyId is used elsewhere.
-    // We'll keep as is and let the API handle validation.
-  };
-  // Remove UI-specific fields
+  // Support both API-shaped data (roomId, periodStart, periodEnd, dueDate, notes)
+  // and UI-shaped data (with legacy amt/due fields).
+  // Backend uses room price snapshot, so amount from UI is ignored by backend.
+  const apiData = { ...billData };
+  // If UI legacy fields are present, map them
+  if (billData.due && !billData.dueDate) apiData.dueDate = billData.due;
+  // Remove UI-specific fields that backend doesn't understand
   delete apiData.amt;
   delete apiData.due;
   delete apiData.per;
-  // Keep other fields like roomId, etc.
   return api.post(`/properties/${propertyId}/bills`, apiData);
 };
 

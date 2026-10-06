@@ -8,7 +8,7 @@ import { Card, Button } from '../components/UIComponents';
 export default function PaymentForm() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { bills, savePayment, getTenantNameByRoom, activePropertyId, fetchBillDetail } = useApp();
+  const { bills, getTenantNameByRoom, activePropertyId, fetchBillDetail } = useApp();
 
   // Bill ID adalah UUID string, jangan dikonversi dengan Number().
   const billId = id;
@@ -17,9 +17,10 @@ export default function PaymentForm() {
   // Seluruh hook dipanggil sebelum early return (Rules of Hooks).
   const [amt, setAmt] = useState('');
   const [method, setMethod] = useState('Cash');
-  const [date, setDate] = useState('2026-10-04');
+  const [date, setDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [note, setNote] = useState('');
   const [err, setErr] = useState('');
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (activePropertyId && billId) {
@@ -46,7 +47,7 @@ export default function PaymentForm() {
 
   const remaining = left(bill);
 
-  const handleSave = (e) => {
+  const handleSave = async (e) => {
     e.preventDefault();
     const cleanAmt = parseInt(String(amt).replace(/\D/g, ''), 10) || 0;
 
@@ -59,8 +60,28 @@ export default function PaymentForm() {
       return;
     }
 
-    savePayment(bill.id, { d: date, amt: cleanAmt, m: method, note });
-    navigate(-1);
+    setLoading(true);
+    setErr('');
+    try {
+      await createPayment(activePropertyId, billId, {
+        d: date,
+        amt: cleanAmt,
+        m: method,
+        note,
+      });
+      // Refetch bill detail to update state with server data
+      await fetchBillDetail(activePropertyId, billId);
+      navigate(-1);
+    } catch (err) {
+      console.error('Gagal membuat pembayaran:', err);
+      if (err && err.message) {
+        setErr(err.message);
+      } else {
+        setErr('Terjadi kesalahan saat memproses pembayaran.');
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -163,10 +184,11 @@ export default function PaymentForm() {
             />
           </div>
 
-          <Button type="submit">Simpan Pembayaran</Button>
+          <Button type="submit" disabled={loading}>
+            {loading ? 'Menyimpan...' : 'Simpan Pembayaran'}
+          </Button>
         </form>
       </div>
     </div>
   );
 }
-
