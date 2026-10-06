@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import * as authApi from '../api/auth';
 import { getToken, setOnSessionExpired } from '../api/client';
 import * as billsApi from '../api/bills';
@@ -133,7 +133,7 @@ export function AppProvider({ children }) {
   const [rooms, setRooms] = useState(INITIAL_ROOMS);
   const [tenants, setTenants] = useState(INITIAL_TENANTS);
   const [bills, setBills] = useState([]);
-  const [owner, setOwner] = useState(INITIAL_OWNER);
+  const [owner, setOwner] = useState({ name: '', email: '', hp: '' });
 
   const login = async (email, password) => {
     setAuthLoading(true);
@@ -357,27 +357,10 @@ export function AppProvider({ children }) {
     try {
       setMode('loading');
       const data = await billsApi.getBills(activePropertyId);
-      // Backend returns { success: true, data: [...] }
+      // api/bills.js#getBills sudah mengembalikan { success, data } dalam bentuk UI
+      // (room = nomor kamar string, amt, due, per, pay). Jangan transform ulang di sini.
       if (data && data.success) {
-        // Transform API bill objects to match expected shape for UI components
-        const transformed = data.data.map((bill) => ({
-          ...bill,
-          // UI expects room as string (room number)
-          room: bill.room ? bill.room.roomNumber : null,
-          // UI expects amt as number
-          amt: bill.amount,
-          // UI expects due as date string (YYYY-MM-DD)
-          due: bill.dueDate,
-          // UI expects perio as formatted string like "20 Sep – 20 Okt 2026"
-          per: bill.periodStart && bill.periodEnd
-            ? formatPeriod(bill.periodStart, bill.periodEnd)
-            : null,
-          // Keep totalPaid, remaining, status for helper functions
-          // Note: pay array is not included in list; we leave it empty.
-          // Helper functions will use totalPaid and remaining if present.
-          pay: [],
-        }));
-        setBills(transformed);
+        setBills(data.data);
         setMode('normal');
       } else {
         setBills([]);
@@ -389,29 +372,42 @@ export function AppProvider({ children }) {
       setMode('error');
     }
   };
-   const fetchBillDetail = async (propertyId, billId) => {
+   // fetchBillDetail distabilkan dengan useCallback agar identitasnya tidak berubah
+   // setiap render; kalau tidak, effect di BillDetail akan memicu fetch tanpa henti.
+   const fetchBillDetail = useCallback(async (propertyId, billId) => {
       if (!propertyId || !billId) return;
       try {
         const data = await billsApi.getBill(propertyId, billId);
         if (data && data.success) {
-          setBills(prev => prev.map(b => b.id === billId ? data.data : b));
+          // data.data sudah berbentuk UI (room string, amt, due, per, pay),
+          // jadi aman menggantikan entri hasil fetchBills.
+          setBills((prev) => {
+            const key = String(billId);
+            const exists = prev.some((b) => String(b.id) === key);
+            if (!exists) {
+              // Membuka /keuangan/tagihan/:id langsung (refresh / deep link):
+              // tambahkan detail ke daftar agar halaman tetap punya data.
+              return [...prev, data.data];
+            }
+            return prev.map((b) => (String(b.id) === key ? data.data : b));
+          });
         }
       } catch (err) {
         console.error('Gagal mengambil detail tagihan:', err);
       }
-    };
+    }, []);
 
    // Fetch houses (properties) dari API
    const fetchHouses = async () => {
      try {
        setMode('loading');
        const data = await propertiesApi.getProperties();
-       // Backend returns { success: true, data: [...] }
-       if (data && data.success) {
+       // propertiesApi.getProperties() sudah mengembalikan array data (payload.data).
+       if (Array.isArray(data)) {
          // Transform API property objects to match expected shape for houses state
          // API: [{ id, name, totalRooms, filledRooms, emptyRooms, activeTenants }]
          // State expects: [{ n: name, k: totalRooms, t: activeTenants }]
-         const transformed = data.data.map((property) => ({
+         const transformed = data.map((property) => ({
            n: property.name,
            k: property.totalRooms,
            t: property.activeTenants,
@@ -425,12 +421,12 @@ export function AppProvider({ children }) {
          setHouses(transformed);
          setMode('normal');
        } else {
-         setHouses(INITIAL_HOUSES);
+         setHouses([]);
          setMode('error');
        }
      } catch (err) {
        console.error('Gagal mengambil daftar rumah:', err);
-       setHouses(INITIAL_HOUSES);
+       setHouses([]);
        setMode('error');
      }
    };
@@ -483,13 +479,15 @@ export function AppProvider({ children }) {
          const transformed = data.map((tenant) => ({
            id: tenant.id,
            name: tenant.name,
-           room: tenant.room ? tenant.room.roomNumber : null, // Assuming room is an object with roomNumber
+           room: tenant.currentRoom ? tenant.currentRoom.roomNumber : null,
+           roomId: tenant.currentRoom ? tenant.currentRoom.id : null,
            hp: tenant.phone,
            addr: tenant.originAddress,
            job: tenant.occupation,
            in: tenant.moveInDate,
-           st: tenant.status || 'Aktif', // Default to Aktif if not provided
-           ktp: tenant.ktpPhoto || `ktp-${tenant.id.toLowerCase()}.jpg`, // Fallback if no photo
+           st: tenant.status === 'KELUAR' ? 'Keluar' : 'Aktif',
+           status: tenant.status,
+           ktp: tenant.ktpPhoto || null,
          }));
          setTenants(transformed);
          setMode('normal');

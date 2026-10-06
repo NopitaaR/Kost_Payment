@@ -9,13 +9,14 @@ export default function BillDetail() {
   const navigate = useNavigate();
   const { bills, deletePayment, getTenantNameByRoom, activePropertyId, fetchBillDetail } = useApp();
 
-  const billId = Number(id);
+  // Bill ID adalah UUID string, jangan dikonversi dengan Number().
+  const billId = id;
   useEffect(() => {
     if (activePropertyId && billId) {
       fetchBillDetail(activePropertyId, billId);
     }
   }, [activePropertyId, billId, fetchBillDetail]);
-  const bill = bills.find((b) => b.id === billId);
+  const bill = bills.find((b) => String(b.id) === String(billId));
 
   if (!bill) {
     return (

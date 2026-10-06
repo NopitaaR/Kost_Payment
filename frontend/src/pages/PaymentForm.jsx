@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useApp, rp, left } from '../context/AppContext';
 import { createPayment } from '../api/payments';
@@ -10,8 +10,27 @@ export default function PaymentForm() {
   const navigate = useNavigate();
   const { bills, savePayment, getTenantNameByRoom, activePropertyId, fetchBillDetail } = useApp();
 
-  const billId = Number(id);
-  const bill = bills.find((b) => b.id === billId);
+  // Bill ID adalah UUID string, jangan dikonversi dengan Number().
+  const billId = id;
+  const bill = bills.find((b) => String(b.id) === String(billId));
+
+  // Seluruh hook dipanggil sebelum early return (Rules of Hooks).
+  const [amt, setAmt] = useState('');
+  const [method, setMethod] = useState('Cash');
+  const [date, setDate] = useState('2026-10-04');
+  const [note, setNote] = useState('');
+  const [err, setErr] = useState('');
+
+  useEffect(() => {
+    if (activePropertyId && billId) {
+      fetchBillDetail(activePropertyId, billId);
+    }
+  }, [activePropertyId, billId, fetchBillDetail]);
+
+  // Nominal default = sisa tagihan, diisi setelah data tagihan tersedia.
+  useEffect(() => {
+    if (bill) setAmt(left(bill));
+  }, [bill]);
 
   if (!bill) {
     return (
@@ -26,12 +45,6 @@ export default function PaymentForm() {
   }
 
   const remaining = left(bill);
-
-  const [amt, setAmt] = useState(remaining);
-  const [method, setMethod] = useState('Cash');
-  const [date, setDate] = useState('2026-10-04');
-  const [note, setNote] = useState('');
-  const [err, setErr] = useState('');
 
   const handleSave = (e) => {
     e.preventDefault();
