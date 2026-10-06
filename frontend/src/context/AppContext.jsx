@@ -8,29 +8,6 @@ import * as tenantsApi from '../api/tenants';
 
 const AppContext = createContext();
 
-const INITIAL_HOUSES = [
-  { n: 'Rumah 1' },
-  { n: 'Rumah 2', k: 8, t: 6 },
-  { n: 'Rumah 3', k: 12, t: 10 },
-];
-
-const INITIAL_ROOMS = [
-  { n: '01', p: 800000, note: '' },
-  { n: '02', p: 700000, note: '' },
-  { n: '03', p: 1000000, note: 'Ada kamar mandi dalam' },
-  { n: '04', p: 700000, note: '' },
-  { n: '05', p: 750000, note: '' },
-];
-
-const INITIAL_TENANTS = [
-  { id: 1, name: 'Andi', room: '01', hp: '0812-3456-7801', addr: 'Binjai', job: 'Karyawan', in: '2026-01-20', st: 'Aktif', ktp: 'ktp-andi.jpg' },
-  { id: 2, name: 'Budi Santoso', room: '01', hp: '0813-9988-2210', addr: 'Medan', job: 'Mahasiswa', in: '2026-01-20', st: 'Aktif', ktp: 'ktp-budi.jpg' },
-  { id: 3, name: 'Sari', room: '03', hp: '0821-7000-1122', addr: 'Pematangsiantar', job: 'Perawat', in: '2026-08-25', st: 'Aktif', ktp: 'ktp-sari.jpg' },
-  { id: 4, name: 'Dewi', room: '04', hp: '0857-1200-3344', addr: 'Tebing Tinggi', job: 'Guru', in: '2026-09-28', st: 'Aktif', ktp: 'ktp-dewi.jpg' },
-  { id: 5, name: 'Rina', room: '05', hp: '0852-6677-8899', addr: 'Kisaran', job: 'Mahasiswa', in: '2026-05-01', st: 'Aktif', ktp: 'ktp-rina.jpg' },
-  { id: 6, name: 'Joko', room: '02', hp: '0811-2233-4455', addr: 'Lubuk Pakam', job: 'Karyawan', in: '2026-01-20', st: 'Keluar', out: '2026-06-30', ktp: 'ktp-joko.jpg' },
-];
-
 export const TODAY = new Date('2026-10-04');
 
 export const rp = (n) => 'Rp' + (Number(n) || 0).toLocaleString('id-ID');
@@ -128,41 +105,11 @@ export function AppProvider({ children }) {
 
   // ===== END AUTHENTICATION =====
 
-  const [selectedHouse, setSelectedHouse] = useState('Rumah 1');
-  const [houses, setHouses] = useState(INITIAL_HOUSES);
-  const [rooms, setRooms] = useState(INITIAL_ROOMS);
-  const [tenants, setTenants] = useState(INITIAL_TENANTS);
+  const [houses, setHouses] = useState([]);
+  const [rooms, setRooms] = useState([]);
+  const [tenants, setTenants] = useState([]);
   const [bills, setBills] = useState([]);
   const [owner, setOwner] = useState({ name: '', email: '', hp: '' });
-
-  const login = async (email, password) => {
-    setAuthLoading(true);
-    setAuthError('');
-    try {
-      const result = await authApi.login(email, password);
-      setUser(result.user);
-      if (result.user) {
-        setOwner({
-          name: result.user.name,
-          email: result.user.email,
-          hp: result.user.phone || '',
-        });
-      }
-      return true;
-    } catch (err) {
-      setAuthError(err.message || 'Login gagal.');
-      return false;
-    } finally {
-      setAuthLoading(false);
-    }
-  };
-
-  const logout = () => {
-    authApi.logout();
-    setUser(null);
-    setSelectedHouse(null);
-    setActivePropertyId(null);
-  };
 
   // Prototype UI Testing State: 'normal', 'empty', 'loading', 'error'
   const [mode, setMode] = useState('normal');
@@ -338,13 +285,10 @@ export function AppProvider({ children }) {
     showToast('Profil disimpan');
   };
 
-  const updateHouseName = (index, newName) => {
+  const updateHouseName = (propertyId, newName) => {
     setHouses((prev) =>
-      prev.map((h, i) => (i === index ? { ...h, n: newName } : h))
+      prev.map((h) => (h._id === propertyId ? { ...h, n: newName } : h))
     );
-    if (selectedHouse === houses[index].n) {
-      setSelectedHouse(newName);
-    }
     showToast('Nama rumah disimpan');
   };
 
@@ -354,216 +298,252 @@ export function AppProvider({ children }) {
       setBills([]);
       return;
     }
+    const propertyId = activePropertyId;
     try {
-      setMode('loading');
-      const data = await billsApi.getBills(activePropertyId);
+      const data = await billsApi.getBills(propertyId);
       // api/bills.js#getBills sudah mengembalikan { success, data } dalam bentuk UI
       // (room = nomor kamar string, amt, due, per, pay). Jangan transform ulang di sini.
       if (data && data.success) {
-        setBills(data.data);
-        setMode('normal');
+        if (propertyId === activePropertyId) {
+          setBills(data.data);
+        }
       } else {
-        setBills([]);
-        setMode('error');
+        if (propertyId === activePropertyId) {
+          setBills([]);
+        }
       }
     } catch (err) {
       console.error('Gagal mengambil tagihan:', err);
-      setBills([]);
-      setMode('error');
+      if (activePropertyId === propertyId) {
+        setBills([]);
+      }
     }
   };
-   // fetchBillDetail distabilkan dengan useCallback agar identitasnya tidak berubah
-   // setiap render; kalau tidak, effect di BillDetail akan memicu fetch tanpa henti.
-   const fetchBillDetail = useCallback(async (propertyId, billId) => {
-      if (!propertyId || !billId) return;
-      try {
-        const data = await billsApi.getBill(propertyId, billId);
-        if (data && data.success) {
-          // data.data sudah berbentuk UI (room string, amt, due, per, pay),
-          // jadi aman menggantikan entri hasil fetchBills.
-          setBills((prev) => {
-            const key = String(billId);
-            const exists = prev.some((b) => String(b.id) === key);
-            if (!exists) {
-              // Membuka /keuangan/tagihan/:id langsung (refresh / deep link):
-              // tambahkan detail ke daftar agar halaman tetap punya data.
-              return [...prev, data.data];
-            }
-            return prev.map((b) => (String(b.id) === key ? data.data : b));
-          });
-        }
-      } catch (err) {
-        console.error('Gagal mengambil detail tagihan:', err);
+
+  // fetchBillDetail distabilkan dengan useCallback agar identitasnya tidak berubah
+  // setiap render; kalau tidak, effect di BillDetail akan memicu fetch tanpa henti.
+  const fetchBillDetail = useCallback(async (propertyId, billId) => {
+    if (!propertyId || !billId) return;
+    try {
+      const data = await billsApi.getBill(propertyId, billId);
+      if (data && data.success) {
+        // data.data sudah berbentuk UI (room string, amt, due, per, pay),
+        // jadi aman menggantikan entri hasil fetchBills.
+        setBills((prev) => {
+          const key = String(billId);
+          const exists = prev.some((b) => String(b.id) === key);
+          if (!exists) {
+            // Membuka /keuangan/tagihan/:id langsung (refresh / deep link):
+            // tambahkan detail ke daftar agar halaman tetap punya data.
+            return [...prev, data.data];
+          }
+          return prev.map((b) => (String(b.id) === key ? data.data : b));
+        });
       }
-    }, []);
+    } catch (err) {
+      console.error('Gagal mengambil detail tagihan:', err);
+    }
+  }, []);
 
-   // Fetch houses (properties) dari API
-   const fetchHouses = async () => {
-     try {
-       setMode('loading');
-       const data = await propertiesApi.getProperties();
-       // propertiesApi.getProperties() sudah mengembalikan array data (payload.data).
-       if (Array.isArray(data)) {
-         // Transform API property objects to match expected shape for houses state
-         // API: [{ id, name, totalRooms, filledRooms, emptyRooms, activeTenants }]
-         // State expects: [{ n: name, k: totalRooms, t: activeTenants }]
-         const transformed = data.map((property) => ({
-           n: property.name,
-           k: property.totalRooms,
-           t: property.activeTenants,
-           // Store additional properties for dashboard use
-           _id: property.id,
-           _totalRooms: property.totalRooms,
-           _filledRooms: property.filledRooms,
-           _emptyRooms: property.emptyRooms,
-           _activeTenants: property.activeTenants,
-         }));
-         setHouses(transformed);
-         setMode('normal');
-       } else {
-         setHouses([]);
-         setMode('error');
-       }
-     } catch (err) {
-       console.error('Gagal mengambil daftar rumah:', err);
-       setHouses([]);
-       setMode('error');
-     }
-   };
+  // Fetch houses (properties) dari API
+  const fetchHouses = async () => {
+    try {
+      const data = await propertiesApi.getProperties();
+      // propertiesApi.getProperties() sudah mengembalikan array data (payload.data).
+      if (Array.isArray(data)) {
+        // Transform API property objects to match expected shape for houses state
+        // API: [{ id, name, totalRooms, filledRooms, emptyRooms, activeTenants }]
+        // State expects: [{ n: name, k: totalRooms, t: activeTenants }]
+        const transformed = data.map((property) => ({
+          n: property.name,
+          k: property.totalRooms,
+          t: property.activeTenants,
+          // Store additional properties for dashboard use
+          _id: property.id,
+          _totalRooms: property.totalRooms,
+          _filledRooms: property.filledRooms,
+          _emptyRooms: property.emptyRooms,
+          _activeTenants: property.activeTenants,
+        }));
+        setHouses(transformed);
+      } else {
+        setHouses([]);
+      }
+    } catch (err) {
+      console.error('Gagal mengambil daftar rumah:', err);
+      setHouses([]);
+    }
+  };
 
-   // Fetch rooms dari API berdasarkan activePropertyId
-   const fetchRooms = async () => {
-     if (!activePropertyId) {
-       setRooms(INITIAL_ROOMS);
-       return;
-     }
-     try {
-       setMode('loading');
-       const data = await roomsApi.getRooms(activePropertyId);
-       if (data && data.success !== false) { // API returns array directly or {success, data}
-         // API returns array of rooms: [{ id, roomNumber, price, notes, tenant }]
-         // Transform to match expected shape for rooms state: [{ n: roomNumber, p: price, note: notes }]
-         const transformed = data.map((room) => ({
-           n: room.roomNumber,
-           p: room.price,
-           note: room.notes || '',
-           // Store additional data for reference
-           _id: room.id,
-           _tenant: room.tenant, // Active tenant if any
-         }));
-         setRooms(transformed);
-         setMode('normal');
-       } else {
-         setRooms(INITIAL_ROOMS);
-         setMode('normal'); // Still normal mode even if API fails, use initial data
-       }
-     } catch (err) {
-       console.error('Gagal mengambil daftar kamar:', err);
-       setRooms(INITIAL_ROOMS);
-       setMode('normal'); // Still normal mode even if API fails, use initial data
-     }
-   };
+  // Fetch rooms dari API berdasarkan activePropertyId
+  const fetchRooms = async () => {
+    if (!activePropertyId) {
+      setRooms([]);
+      return;
+    }
+    const propertyId = activePropertyId;
+    try {
+      const data = await roomsApi.getRooms(propertyId);
+      if (data && data.success !== false) { // API returns array directly or {success, data}
+        // API returns array of rooms: [{ id, roomNumber, price, notes, tenant }]
+        // Transform to match expected shape for rooms state: [{ n: roomNumber, p: price, note: notes }]
+        const transformed = data.map((room) => ({
+          n: room.roomNumber,
+          p: room.price,
+          note: room.notes || '',
+          // Store additional data for reference
+          _id: room.id,
+          _tenant: room.tenant, // Active tenant if any
+        }));
+        if (propertyId === activePropertyId) {
+          setRooms(transformed);
+        }
+      } else {
+        if (propertyId === activePropertyId) {
+          setRooms([]);
+        }
+      }
+    } catch (err) {
+      console.error('Gagal mengambil daftar kamar:', err);
+      if (activePropertyId === propertyId) {
+        setRooms([]);
+      }
+    }
+  };
 
-   // Fetch tenants dari API berdasarkan activePropertyId
-   const fetchTenants = async () => {
-     if (!activePropertyId) {
-       setTenants(INITIAL_TENANTS);
-       return;
-     }
-     try {
-       setMode('loading');
-       const data = await tenantsApi.getTenants(activePropertyId);
-       if (data && data.success !== false) { // API returns array directly or {success, data}
-         // API returns array of tenants: [{ id, name, phone, originAddress, occupation, moveInDate, room, ktpPhoto, notes, status }]
-         // Transform to match expected shape for tenants state: [{ id, name, room, hp, addr, job, in, st, ktp }]
-         const transformed = data.map((tenant) => ({
-           id: tenant.id,
-           name: tenant.name,
-           room: tenant.currentRoom ? tenant.currentRoom.roomNumber : null,
-           roomId: tenant.currentRoom ? tenant.currentRoom.id : null,
-           hp: tenant.phone,
-           addr: tenant.originAddress,
-           job: tenant.occupation,
-           in: tenant.moveInDate,
-           st: tenant.status === 'KELUAR' ? 'Keluar' : 'Aktif',
-           status: tenant.status,
-           ktp: tenant.ktpPhoto || null,
-         }));
-         setTenants(transformed);
-         setMode('normal');
-       } else {
-         setTenants(INITIAL_TENANTS);
-         setMode('normal'); // Still normal mode even if API fails, use initial data
-       }
-     } catch (err) {
-       console.error('Gagal mengambil daftar penghuni:', err);
-       setTenants(INITIAL_TENANTS);
-       setMode('normal'); // Still normal mode even if API fails, use initial data
-     }
-   };
+  // Fetch tenants dari API berdasarkan activePropertyId
+  const fetchTenants = async () => {
+    if (!activePropertyId) {
+      setTenants([]);
+      return;
+    }
+    const propertyId = activePropertyId;
+    try {
+      const data = await tenantsApi.getTenants(propertyId);
+      if (data && data.success !== false) { // API returns array directly or {success, data}
+        // API returns array of tenants: [{ id, name, phone, originAddress, occupation, moveInDate, room, ktpPhoto, notes, status }]
+        // Transform to match expected shape for tenants state: [{ id, name, room, hp, addr, job, in, st, ktp }]
+        const transformed = data.map((tenant) => ({
+          id: tenant.id,
+          name: tenant.name,
+          room: tenant.currentRoom ? tenant.currentRoom.roomNumber : null,
+          roomId: tenant.currentRoom ? tenant.currentRoom.id : null,
+          hp: tenant.phone,
+          addr: tenant.originAddress,
+          job: tenant.occupation,
+          in: tenant.moveInDate,
+          st: tenant.status === 'KELUAR' ? 'Keluar' : 'Aktif',
+          status: tenant.status,
+          ktp: tenant.ktpPhoto || null,
+        }));
+        if (propertyId === activePropertyId) {
+          setTenants(transformed);
+        }
+      } else {
+        if (propertyId === activePropertyId) {
+          setTenants([]);
+        }
+      }
+    } catch (err) {
+      console.error('Gagal mengambil daftar penghuni:', err);
+      if (activePropertyId === propertyId) {
+        setTenants([]);
+      }
+    }
+  };
 
-   // Fetch bills, houses, rooms, dan tenants ketika activePropertyId berubah atau user login
-   useEffect(() => {
-     if (isLoggedIn) {
-       fetchHouses();
-       fetchBills();
-       fetchRooms();
-       fetchTenants();
-     }
-   }, [activePropertyId, isLoggedIn]);
+  // Fetch bills, houses, rooms, dan tenants ketika activePropertyId berubah atau user login
+  useEffect(() => {
+    if (!isLoggedIn) return;
+    setMode('loading');
+    // Reset state
+    setHouses([]);
+    setRooms([]);
+    setTenants([]);
+    setBills([]);
 
-   return (
-     <AppContext.Provider
-       value={{
-         isLoggedIn,
-         user,
-         authReady,
-         authLoading,
-         authError,
-         login,
-         logout,
-         activePropertyId,
-         setActivePropertyId,
-         selectedHouse,
-         setSelectedHouse,
-         houses,
-         setHouses,
-         rooms,
-         setRooms,
-         tenants,
-         setTenants,
-         bills,
-         setBills,
-         owner,
-         setOwner,
-         mode,
-         setMode,
-         sheetContent,
-         setSheetContent,
-         openSheet,
-         closeSheet,
-         toastMsg,
-         toastVisible,
-         showToast,
-         confirmDialog,
-         getActiveTenantsByRoom,
-         getTenantNameByRoom,
-         getUnpaidBills,
-         saveRoom,
-         deleteRoom,
-         addTenant,
-         moveTenant,
-         exitTenant,
-         savePayment,
-         deletePayment,
-         updateOwner,
-         updateHouseName,
-          fetchBillDetail,
-       }}
-     >
-       {children}
-     </AppContext.Provider>
-   );
- }
+    // We'll collect promises for the fetches we want to wait for
+    const promises = [];
+
+    // Always fetch houses
+    promises.push(fetchHouses());
+
+    // If we have an activePropertyId, fetch rooms, tenants, and bills
+    if (activePropertyId) {
+      promises.push(fetchRooms());
+      promises.push(fetchTenants());
+      promises.push(fetchBills());
+    }
+
+    // Wait for all fetches to complete
+    Promise.allSettled(promises)
+      .then((results) => {
+        // If any of the promises rejected, set mode to error
+        const hasError = results.some((result) => result.status === 'rejected');
+        if (hasError) {
+          setMode('error');
+        } else {
+          setMode('normal');
+        }
+      })
+      .catch(() => {
+        // This should not happen because allSettled doesn't reject, but just in case
+        setMode('error');
+      });
+  }, [activePropertyId, isLoggedIn]);
+
+  return (
+    <AppContext.Provider
+      value={{
+        isLoggedIn,
+        user,
+        authReady,
+        authLoading,
+        authError,
+        login,
+        logout,
+        activePropertyId,
+        setActivePropertyId,
+        // selectedHouse is computed from houses and activePropertyId
+        selectedHouse: houses.find((h) => h._id === activePropertyId)?.n || '',
+        setSelectedHouse: (id) => setActivePropertyId(id), // For compatibility, we map to setActivePropertyId
+        houses,
+        setHouses,
+        rooms,
+        setRooms,
+        tenants,
+        setTenants,
+        setBills,
+        owner,
+        setOwner,
+        mode,
+        setMode,
+        sheetContent,
+        setSheetContent,
+        openSheet,
+        closeSheet,
+        toastMsg,
+        toastVisible,
+        showToast,
+        confirmDialog,
+        getActiveTenantsByRoom,
+        getTenantNameByRoom,
+        getUnpaidBills,
+        saveRoom,
+        deleteRoom,
+        addTenant,
+        moveTenant,
+        exitTenant,
+        savePayment,
+        deletePayment,
+        updateOwner,
+        updateHouseName,
+        fetchBillDetail,
+      }}
+    >
+      {children}
+    </AppContext.Provider>
+  );
+}
 
 export const useApp = () => useContext(AppContext);
