@@ -6,14 +6,14 @@ import { Button } from '../components/UIComponents';
 
 export default function Password() {
   const navigate = useNavigate();
-  const { showToast } = useApp();
+  const { showToast, changePassword } = useApp();
 
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [err, setErr] = useState('');
 
-  const handleSave = (e) => {
+  const handleSave = async (e) => {
     e.preventDefault();
 
     if (!oldPassword) {
@@ -34,8 +34,13 @@ export default function Password() {
     }
 
     setErr('');
-    showToast('Password diubah');
-    navigate(-1);
+    try {
+      await changePassword(oldPassword, newPassword);
+      showToast('Password berhasil diubah');
+      navigate(-1);
+    } catch (err) {
+      setErr('Gagal mengganti password: ' + (err.message || ''));
+    }
   };
 
   return (

@@ -6,14 +6,14 @@ import { Avatar, Button } from '../components/UIComponents';
 
 export default function Profile() {
   const navigate = useNavigate();
-  const { owner, updateOwner } = useApp();
+  const { owner, updateOwner, updateProfile } = useApp();
 
   const [name, setName] = useState(owner.name || '');
   const [email, setEmail] = useState(owner.email || '');
   const [hp, setHp] = useState(owner.hp || '');
   const [err, setErr] = useState('');
 
-  const handleSave = (e) => {
+  const handleSave = async (e) => {
     e.preventDefault();
     const cleanName = name.trim();
     const cleanEmail = email.trim();
@@ -29,8 +29,13 @@ export default function Profile() {
     }
 
     setErr('');
-    updateOwner({ name: cleanName, email: cleanEmail, hp: cleanHp });
-    navigate(-1);
+    try {
+      await updateProfile({ name: cleanName, email: cleanEmail, phone: cleanHp });
+      updateOwner({ name: cleanName, email: cleanEmail, hp: cleanHp });
+      navigate(-1);
+    } catch (err) {
+      setErr('Gagal menyimpan profil: ' + (err.message || ''));
+    }
   };
 
   return (

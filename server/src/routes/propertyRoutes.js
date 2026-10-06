@@ -17,6 +17,53 @@ router.use('/:propertyId/occupancies', occupancyRoutes);
 router.use('/:propertyId/bills', billRoutes);
 router.use('/:propertyId', paymentRoutes);
 
+// PUT /api/v1/properties/:propertyId/name - Update nama rumah (hanya pemilik yang bisa)
+router.put('/:propertyId/name', authenticateToken, async (req, res) => {
+  try {
+    const { name } = req.body;
+    const { propertyId } = req.params;
+    const userId = req.user.id;
+
+    if (!name || !name.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Nama rumah wajib diisi.',
+      });
+    }
+
+    const property = await prisma.property.findFirst({
+      where: {
+        id: propertyId,
+        userId,
+      },
+    });
+
+    if (!property) {
+      return res.status(404).json({
+        success: false,
+        message: 'Rumah tidak ditemukan atau bukan milik Anda.',
+      });
+    }
+
+    const updatedProperty = await prisma.property.update({
+      where: { id: propertyId },
+      data: { name: name.trim() },
+      select: { id: true, name: true, userId: true },
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: { id: updatedProperty.id, name: updatedProperty.name },
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: 'Gagal memperbarui nama rumah.',
+      error: error.message,
+    });
+  }
+});
+
 // Semua route property memerlukan otentikasi JWT
 router.use(authenticateToken);
 

@@ -5,6 +5,7 @@ import * as billsApi from '../api/bills';
 import * as propertiesApi from '../api/properties';
 import * as roomsApi from '../api/rooms';
 import * as tenantsApi from '../api/tenants';
+import * as propertiesApiFromServer from '../api/properties'; // alias to avoid confusion
 
 const AppContext = createContext();
 
@@ -308,11 +309,44 @@ export function AppProvider({ children }) {
     showToast('Profil disimpan');
   };
 
-  const updateHouseName = (propertyId, newName) => {
-    setHouses((prev) =>
-      prev.map((h) => (h._id === propertyId ? { ...h, n: newName } : h))
-    );
-    showToast('Nama rumah disimpan');
+  // Update profile via backend API
+  const updateProfile = async (newOwner) => {
+    try {
+      const payload = await authApi.updateProfile(newOwner);
+      setOwner(newOwner);
+      showToast('Profil berhasil diperbarui dari backend');
+      return payload;
+    } catch (err) {
+      showToast('Gagal memperbarui profil: ' + (err.message || ''));
+      throw err;
+    }
+  };
+
+  // Change password via backend API
+  const changePassword = async (oldPassword, newPassword) => {
+    try {
+      const payload = await authApi.changePassword(oldPassword, newPassword);
+      showToast('Password berhasil diubah');
+      return payload;
+    } catch (err) {
+      showToast('Gagal mengganti password: ' + (err.message || ''));
+      throw err;
+    }
+  };
+
+  const updateHouseName = async (propertyId, newName) => {
+    try {
+      if (propertyId) {
+        await propertiesApi.updatePropertyName(propertyId, newName);
+      }
+      setHouses((prev) =>
+        prev.map((h) => (h._id === propertyId ? { ...h, n: newName } : h))
+      );
+      showToast('Nama rumah disimpan');
+    } catch (err) {
+      showToast('Gagal menyimpan nama rumah: ' + (err.message || ''));
+      throw err;
+    }
   };
 
   // Fetch bills dari API berdasarkan activePropertyId
@@ -562,6 +596,8 @@ export function AppProvider({ children }) {
         savePayment,
         deletePayment,
         updateOwner,
+        updateProfile,
+        changePassword,
         updateHouseName,
         fetchBillDetail,
       }}

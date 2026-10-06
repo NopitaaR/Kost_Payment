@@ -17,6 +17,28 @@ export async function login(email, password) {
   };
 }
 
+// PUT /api/v1/auth/profile
+// Update profile data pemilik (nama, email, hp)
+export async function updateProfile(profileData) {
+  const payload = await api.put(
+    '/auth/profile',
+    profileData,
+    { requireAuth: true }
+  );
+  return payload;
+}
+
+// POST /api/v1/auth/change-password
+// Ganti password untuk user yang terautentikasi
+export async function changePassword(oldPassword, newPassword) {
+  const payload = await api.post(
+    '/auth/change-password',
+    { oldPassword, newPassword },
+    { requireAuth: true }
+  );
+  return payload;
+}
+
 // GET /api/v1/auth/me
 // Backend mengembalikan { success, user }
 export async function getMe() {

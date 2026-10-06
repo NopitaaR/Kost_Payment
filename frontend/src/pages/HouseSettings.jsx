@@ -7,7 +7,7 @@ import { Card, Button } from '../components/UIComponents';
 export default function HouseSettings() {
   const { index } = useParams();
   const navigate = useNavigate();
-  const { houses, rooms, tenants, updateHouseName } = useApp();
+  const { houses, updateHouseName, showToast } = useApp();
 
   const houseIndex = parseInt(index, 10);
   const house = houses[houseIndex];
@@ -24,18 +24,18 @@ export default function HouseSettings() {
     );
   }
 
-  const [houseName, setHouseName] = useState(house.n);
+  // Gunakan propertyId dari backend sebagai identitas utama
+  const propertyId = house._id || house.id;
+
+  // Statistics for this house - ambil dari data property
+  const totalRooms = house._totalRooms !== undefined ? house._totalRooms : house.k || 0;
+  const filledRooms = house._filledRooms !== undefined ? house._filledRooms : house.t || 0;
+  const emptyRooms = house._emptyRooms !== undefined ? house._emptyRooms : totalRooms - filledRooms;
+
+  const [houseName, setHouseName] = useState(house.n || house.name || '');
   const [err, setErr] = useState('');
 
-  // Statistics for this house
-  const totalRooms = houseIndex === 0 ? rooms.length : house.k || 0;
-  const filledRooms =
-    houseIndex === 0
-      ? rooms.filter((r) => tenants.some((t) => t.room === r.n && t.st === 'Aktif')).length
-      : house.t || 0;
-  const emptyRooms = totalRooms - filledRooms;
-
-  const handleSave = (e) => {
+  const handleSave = async (e) => {
     e.preventDefault();
     const cleanName = houseName.trim();
 
@@ -44,23 +44,20 @@ export default function HouseSettings() {
       return;
     }
 
-    const isDuplicate = houses.some(
-      (h, j) => j !== houseIndex && h.n.toLowerCase() === cleanName.toLowerCase()
-    );
-
-    if (isDuplicate) {
-      setErr('Nama rumah sudah dipakai.');
-      return;
+    try {
+      // Kirim ke backend menggunakan propertyId
+      await updateHouseName(propertyId, cleanName);
+      setHouseName(cleanName);
+      if (showToast) showToast('Nama rumah disimpan');
+      navigate(-1);
+    } catch (err) {
+      setErr('Gagal memperbarui nama rumah: ' + (err.message || ''));
     }
-
-    setErr('');
-    updateHouseName(houseIndex, cleanName);
-    navigate(-1);
   };
 
   return (
     <div>
-      <Header title={`Pengaturan ${house.n}`} />
+      <Header title={`Pengaturan ${house.n || ''}`} />
 
       <div className="px-[18px]">
         <form onSubmit={handleSave}>
