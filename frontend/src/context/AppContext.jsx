@@ -165,7 +165,18 @@ export function AppProvider({ children }) {
     openSheet(
       <div>
         <h3 className="text-[18px] font-bold mb-[6px]">{title}</h3>
-        <p className="text-mute text-sm mb-4" dangerouslySetInnerHTML={{ __html: body }}></p>
+        {typeof body === 'string' ? (
+          <div className="text-mute text-sm mb-4">
+            {body.split(/<br\s*\/?>/gi).map((part, i) => (
+              <React.Fragment key={i}>
+                {i > 0 && <br />}
+                {part}
+              </React.Fragment>
+            ))}
+          </div>
+        ) : (
+          <div className="text-mute text-sm mb-4">{body}</div>
+        )}
         <div className="flex gap-[10px] mt-[14px]">
           <button
             className="flex-1 border border-line bg-card rounded-[14px] p-[14px] font-bold text-ink"

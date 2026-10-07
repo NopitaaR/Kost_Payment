@@ -37,8 +37,14 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
 
-  // Jangan sentuh atau cache request API atau metode selain GET
-  if (event.request.method !== 'GET' || url.pathname.startsWith('/api')) {
+  // Jangan sentuh atau cache request API, authenticated request, KTP, atau metode selain GET
+  if (
+    event.request.method !== 'GET' ||
+    url.pathname.startsWith('/api') ||
+    url.pathname.includes('/ktp') ||
+    url.pathname.includes('/uploads') ||
+    event.request.headers.has('Authorization')
+  ) {
     return;
   }
 

@@ -5,8 +5,8 @@ import { useApp } from '../context/AppContext';
 export default function Login() {
   const navigate = useNavigate();
   const { login, authLoading, authError, showToast } = useApp();
-  const [email, setEmail] = useState('pemilik@kost.id');
-  const [password, setPassword] = useState('rahasia123');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
 
   const handleLogin = async (e) => {
     e.preventDefault();

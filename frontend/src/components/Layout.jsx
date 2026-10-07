@@ -18,7 +18,7 @@ export default function Layout({ children }) {
         id="app"
         className={`max-w-[480px] mx-auto min-h-screen pb-[96px] md:max-w-none ${showNav ? 'md:pl-[230px]' : ''} md:pb-[40px]`}
       >
-        <PrototypeBar />
+        {import.meta.env.DEV ? <PrototypeBar /> : null}
         <div className="max-w-full md:max-w-[640px] md:mx-auto">
           {children}
         </div>
