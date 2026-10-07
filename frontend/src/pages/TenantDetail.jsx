@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useApp, fd, rp } from '../context/AppContext';
+import { useApp, fd, rp, isUUID } from '../context/AppContext';
 import Header from '../components/Header';
 import { Card, Badge, Avatar, Button } from '../components/UIComponents';
 import { SkeletonLoader, ErrorState } from '../components/StateComponents';
@@ -32,7 +32,7 @@ export default function TenantDetail() {
   const [notFound, setNotFound] = useState(false);
 
   const fetchTenantDetail = useCallback(async () => {
-    if (!activePropertyId || !id) return;
+    if (!activePropertyId || !id || !isUUID(activePropertyId)) return;
     setLoading(true);
     setError(false);
     setNotFound(false);
@@ -65,7 +65,9 @@ export default function TenantDetail() {
       navigate('/pilih-rumah', { replace: true });
       return;
     }
-    fetchTenantDetail();
+    if (isUUID(activePropertyId)) {
+      fetchTenantDetail();
+    }
   }, [activePropertyId, navigate, fetchTenantDetail]);
 
   const handleShowKtp = () => {

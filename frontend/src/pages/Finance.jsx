@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { useApp, rp, fd, left, paid, st } from '../context/AppContext';
+import { useApp, rp, fd, left, paid, st, isUUID } from '../context/AppContext';
 import { getPropertyPayments, deletePayment } from '../api/payments';
 import { createBill, generateBills } from '../api/bills';
 import Header from '../components/Header';
@@ -58,15 +58,16 @@ export default function Finance() {
   const [manualBillError, setManualBillError] = useState('');
   const [manualBillLoading, setManualBillLoading] = useState(false);
 
-  // Fetch payments for the active property when it changes
+  // Fetch payments and bills for the active property when it changes
   useEffect(() => {
-    if (activePropertyId) {
+    if (activePropertyId && isUUID(activePropertyId)) {
       fetchPayments();
+      fetchBills();
     }
   }, [activePropertyId]);
 
   const fetchPayments = async () => {
-    if (!activePropertyId) return;
+    if (!activePropertyId || !isUUID(activePropertyId)) return;
     setPaymentsLoading(true);
     setPaymentsError('');
     try {

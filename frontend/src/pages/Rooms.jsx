@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useApp, rp } from '../context/AppContext';
+import { useApp, rp, isUUID } from '../context/AppContext';
 import Header from '../components/Header';
 import { Card, Badge, Chip, FAB, Button } from '../components/UIComponents';
 import { SkeletonLoader, ErrorState, EmptyState } from '../components/StateComponents';
@@ -17,7 +17,7 @@ export default function Rooms() {
   const [filter, setFilter] = useState('Semua'); // 'Semua', 'Terisi', 'Kosong'
 
   const fetchRooms = useCallback(async () => {
-    if (!activePropertyId) return;
+    if (!activePropertyId || !isUUID(activePropertyId)) return;
     setLoading(true);
     setError(false);
     try {
@@ -35,7 +35,9 @@ export default function Rooms() {
       navigate('/pilih-rumah', { replace: true });
       return;
     }
-    fetchRooms();
+    if (isUUID(activePropertyId)) {
+      fetchRooms();
+    }
   }, [activePropertyId, navigate, fetchRooms]);
 
   const filteredRooms = rooms.filter((r) => {

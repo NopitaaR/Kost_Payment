@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { useApp, rp } from '../context/AppContext';
+import { useApp, rp, isUUID } from '../context/AppContext';
 import Header from '../components/Header';
 import { Button } from '../components/UIComponents';
-import { SkeletonLoader } from '../components/StateComponents';
 import { getRooms } from '../api/rooms';
 import { createTenant, uploadKtp } from '../api/tenants';
 
@@ -12,9 +11,14 @@ export default function TenantForm() {
   const navigate = useNavigate();
   const { activePropertyId, showToast } = useApp();
 
+  const passedRoomId = location.state?.roomId;
+  const passedRoomNumber = location.state?.roomNumber || location.state?.room;
+  const passedRoomPrice = location.state?.roomPrice || location.state?.price;
+
   const [step, setStep] = useState(1);
-  const [rooms, setRooms] = useState([]);
-  const [loadingRooms, setLoadingRooms] = useState(true);
+  const [roomInfo, setRoomInfo] = useState(
+    passedRoomId ? { id: passedRoomId, roomNumber: passedRoomNumber, price: passedRoomPrice } : null
+  );
   const [submitting, setSubmitting] = useState(false);
   const [uploadingKtp, setUploadingKtp] = useState(false);
   const [ktpError, setKtpError] = useState('');
@@ -25,7 +29,7 @@ export default function TenantForm() {
     addr: '',
     job: '',
     in: new Date().toISOString().split('T')[0],
-    roomId: '',
+    roomId: passedRoomId || '',
     ktp: '',
     ktpDisplayName: '',
   });
@@ -38,36 +42,39 @@ export default function TenantForm() {
       return;
     }
 
-    (async () => {
-      setLoadingRooms(true);
-      try {
-        const fetchedRooms = await getRooms(activePropertyId);
-        setRooms(fetchedRooms);
+    if (!isUUID(activePropertyId)) return;
 
-        // Pre-select kamar jika datang dari RoomDetail
-        const stateRoomId = location.state?.roomId;
-        const stateRoomNum = location.state?.room;
+    if (!passedRoomId) {
+      return;
+    }
 
-        let selectedId = '';
-        if (stateRoomId && fetchedRooms.some((r) => r.id === stateRoomId)) {
-          selectedId = stateRoomId;
-        } else if (stateRoomNum) {
-          const match = fetchedRooms.find((r) => r.roomNumber === stateRoomNum);
-          if (match) selectedId = match.id;
-        }
+    // Ambil info kamar jika nomor atau harga belum ada di state
+    if (!roomInfo?.roomNumber || !roomInfo?.price) {
+      (async () => {
+        try {
+          const fetchedRooms = await getRooms(activePropertyId);
+          const match = fetchedRooms.find((r) => r.id === passedRoomId);
+          if (match) {
+            setRoomInfo({ id: match.id, roomNumber: match.roomNumber, price: match.price });
+          }
+        } catch (_) {}
+      })();
+    }
+  }, [activePropertyId, passedRoomId, navigate]);
 
-        if (!selectedId && fetchedRooms.length > 0) {
-          selectedId = fetchedRooms[0].id;
-        }
-
-        setDraft((prev) => ({ ...prev, roomId: selectedId }));
-      } catch (e) {
-        setErr('Gagal memuat daftar kamar.');
-      } finally {
-        setLoadingRooms(false);
-      }
-    })();
-  }, [activePropertyId, location.state, navigate]);
+  if (!passedRoomId) {
+    return (
+      <div>
+        <Header title="Tambah Penghuni" />
+        <div className="px-[18px] text-center py-10">
+          <p className="text-mute mb-4">
+            Penghuni hanya dapat ditambahkan melalui Detail Kamar. Silakan pilih kamar terlebih dahulu.
+          </p>
+          <Button onClick={() => navigate('/kamar')}>Pilih Kamar</Button>
+        </div>
+      </div>
+    );
+  }
 
   const handleNext1 = () => {
     if (!draft.name.trim()) {
@@ -123,8 +130,8 @@ export default function TenantForm() {
   };
 
   const handleSave = async () => {
-    if (!draft.roomId) {
-      setErr('Silakan pilih kamar.');
+    if (!passedRoomId) {
+      setErr('Kamar wajib dipilih melalui Detail Kamar.');
       return;
     }
     if (!draft.in) {
@@ -142,12 +149,12 @@ export default function TenantForm() {
         originAddress: draft.addr.trim(),
         occupation: draft.job.trim(),
         moveInDate: draft.in,
-        roomId: draft.roomId,
+        roomId: passedRoomId,
         ktpPhoto: draft.ktp || null,
       });
 
       showToast('Penghuni disimpan');
-      navigate('/penghuni');
+      navigate(`/kamar/${passedRoomId}`);
     } catch (error) {
       setErr(error.message || 'Gagal menyimpan penghuni.');
     } finally {
@@ -236,54 +243,35 @@ export default function TenantForm() {
           </div>
         ) : (
           <div>
-            {loadingRooms ? (
-              <div className="py-4">
-                <SkeletonLoader />
+            <div className="mb-[14px]">
+              <label className="block text-[13px] font-semibold mb-[6px] text-mute">
+                Kamar
+              </label>
+              <div className="w-full border border-line bg-card rounded-[12px] p-[12px_14px] font-bold text-ink">
+                Kamar {roomInfo?.roomNumber || '—'} {roomInfo?.price ? `— ${rp(roomInfo.price)}` : ''}
               </div>
-            ) : (
-              <>
-                <div className="mb-[14px]">
-                  <label className="block text-[13px] font-semibold mb-[6px] text-ink">
-                    Tanggal masuk
-                  </label>
-                  <input
-                    type="date"
-                    className="w-full border border-line bg-card rounded-[12px] p-[12px_14px] outline-none focus:outline-2 focus:outline-brand"
-                    value={draft.in}
-                    onChange={(e) => setDraft({ ...draft, in: e.target.value })}
-                  />
-                </div>
+            </div>
 
-                <div className="mb-[14px]">
-                  <label className="block text-[13px] font-semibold mb-[6px] text-ink">
-                    Pilih kamar
-                  </label>
-                  <select
-                    className="w-full border border-line bg-card rounded-[12px] p-[12px_14px] outline-none focus:outline-2 focus:outline-brand"
-                    value={draft.roomId}
-                    onChange={(e) => setDraft({ ...draft, roomId: e.target.value })}
-                  >
-                    {rooms.map((r) => (
-                      <option key={r.id} value={r.id}>
-                        Kamar {r.roomNumber} — {rp(r.price)}
-                      </option>
-                    ))}
-                  </select>
-                  <p className="text-[13px] text-mute mt-[6px]">
-                    Jika kamar sudah berpenghuni, tagihan tetap satu untuk kamar.
-                  </p>
-                </div>
+            <div className="mb-[14px]">
+              <label className="block text-[13px] font-semibold mb-[6px] text-ink">
+                Tanggal masuk
+              </label>
+              <input
+                type="date"
+                className="w-full border border-line bg-card rounded-[12px] p-[12px_14px] outline-none focus:outline-2 focus:outline-brand"
+                value={draft.in}
+                onChange={(e) => setDraft({ ...draft, in: e.target.value })}
+              />
+            </div>
 
-                {err && <div className="text-bad text-[13px] mb-2">{err}</div>}
+            {err && <div className="text-bad text-[13px] mb-2">{err}</div>}
 
-                <Button onClick={handleSave} disabled={submitting}>
-                  {submitting ? 'Menyimpan…' : 'Simpan Penghuni'}
-                </Button>
-                <Button variant="ghost" onClick={() => setStep(1)} disabled={submitting}>
-                  Kembali
-                </Button>
-              </>
-            )}
+            <Button onClick={handleSave} disabled={submitting}>
+              {submitting ? 'Menyimpan…' : 'Simpan Penghuni'}
+            </Button>
+            <Button variant="ghost" onClick={() => setStep(1)} disabled={submitting}>
+              Kembali
+            </Button>
           </div>
         )}
       </div>

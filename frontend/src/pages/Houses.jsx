@@ -6,7 +6,7 @@ import { SkeletonLoader, ErrorState, EmptyState } from '../components/StateCompo
 
 export default function Houses() {
   const navigate = useNavigate();
-  const { setActivePropertyId, setSelectedHouse } = useApp();
+  const { setActivePropertyId } = useApp();
 
   const [properties, setProperties] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -31,7 +31,6 @@ export default function Houses() {
 
   const handleSelectHouse = (property) => {
     setActivePropertyId(property.id);
-    setSelectedHouse(property.name);
     navigate('/');
   };
 

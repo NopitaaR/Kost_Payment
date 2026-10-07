@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useApp } from '../context/AppContext';
+import { useApp, isUUID, formatRupiah, parseRupiah } from '../context/AppContext';
 import Header from '../components/Header';
 import { Button } from '../components/UIComponents';
 import { SkeletonLoader } from '../components/StateComponents';
@@ -27,6 +27,8 @@ export default function RoomForm() {
       return;
     }
 
+    if (!isUUID(activePropertyId)) return;
+
     if (isEdit && roomNum) {
       (async () => {
         setLoadingEdit(true);
@@ -49,7 +51,7 @@ export default function RoomForm() {
           const data = await getRoom(activePropertyId, targetId);
           if (data) {
             setN(data.roomNumber || '');
-            setP(String(data.price || ''));
+            setP(formatRupiah(data.price));
             setNote(data.notes || '');
           }
         } catch (error) {
@@ -66,7 +68,7 @@ export default function RoomForm() {
     setErr('');
 
     const cleanNumber = n.trim();
-    const cleanPrice = parseInt(String(p).replace(/\D/g, ''), 10) || 0;
+    const cleanPrice = parseRupiah(p);
 
     if (!cleanNumber) {
       setErr('Nomor kamar wajib diisi.');
@@ -133,9 +135,9 @@ export default function RoomForm() {
                 type="text"
                 inputMode="numeric"
                 className="w-full border border-line bg-card rounded-[12px] p-[12px_14px] outline-none focus:outline-2 focus:outline-brand"
-                placeholder="Rp 800000"
+                placeholder="Rp0"
                 value={p}
-                onChange={(e) => setP(e.target.value)}
+                onChange={(e) => setP(formatRupiah(e.target.value))}
               />
               <p className="text-[13px] text-mute mt-[6px]">
                 Perubahan harga tidak mengubah tagihan lama.

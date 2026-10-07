@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useApp, rp, fd } from '../context/AppContext';
+import { useApp, rp, fd, isUUID } from '../context/AppContext';
 import Header from '../components/Header';
 import { Card, Button, Badge } from '../components/UIComponents';
 import { SkeletonLoader, ErrorState } from '../components/StateComponents';
@@ -17,7 +17,7 @@ export default function RoomDetail() {
   const [notFound, setNotFound] = useState(false);
 
   const fetchRoomDetail = useCallback(async () => {
-    if (!activePropertyId || !roomNum) return;
+    if (!activePropertyId || !roomNum || !isUUID(activePropertyId)) return;
     setLoading(true);
     setError(false);
     setNotFound(false);
@@ -60,7 +60,9 @@ export default function RoomDetail() {
       navigate('/pilih-rumah', { replace: true });
       return;
     }
-    fetchRoomDetail();
+    if (isUUID(activePropertyId)) {
+      fetchRoomDetail();
+    }
   }, [activePropertyId, navigate, fetchRoomDetail]);
 
   const handleDelete = () => {
@@ -166,7 +168,7 @@ export default function RoomDetail() {
           <p className="text-mute text-sm mb-2">Belum ada penghuni.</p>
         )}
 
-        <Button onClick={() => navigate('/penghuni/tambah', { state: { room: room.roomNumber, roomId: room.id } })}>
+        <Button onClick={() => navigate('/penghuni/tambah', { state: { roomId: room.id, roomNumber: room.roomNumber, roomPrice: room.price } })}>
           + Tambah Penghuni
         </Button>
 

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useApp, rp, left } from '../context/AppContext';
+import { useApp, rp, left, isUUID, formatRupiah, parseRupiah } from '../context/AppContext';
 import { createPayment } from '../api/payments';
 import Header from '../components/Header';
 import { Card, Button } from '../components/UIComponents';
@@ -8,7 +8,7 @@ import { Card, Button } from '../components/UIComponents';
 export default function PaymentForm() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { bills, getTenantNameByRoom, activePropertyId, fetchBillDetail } = useApp();
+  const { bills, getTenantNameByRoom, activePropertyId, fetchBillDetail, fetchBills } = useApp();
 
   // Bill ID adalah UUID string, jangan dikonversi dengan Number().
   const billId = id;
@@ -23,14 +23,14 @@ export default function PaymentForm() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (activePropertyId && billId) {
+    if (activePropertyId && billId && isUUID(activePropertyId)) {
       fetchBillDetail(activePropertyId, billId);
     }
   }, [activePropertyId, billId, fetchBillDetail]);
 
   // Nominal default = sisa tagihan, diisi setelah data tagihan tersedia.
   useEffect(() => {
-    if (bill) setAmt(left(bill));
+    if (bill) setAmt(formatRupiah(left(bill)));
   }, [bill]);
 
   if (!bill) {
@@ -49,7 +49,7 @@ export default function PaymentForm() {
 
   const handleSave = async (e) => {
     e.preventDefault();
-    const cleanAmt = parseInt(String(amt).replace(/\D/g, ''), 10) || 0;
+    const cleanAmt = parseRupiah(amt);
 
     if (cleanAmt <= 0) {
       setErr('Masukkan jumlah pembayaran.');
@@ -69,8 +69,11 @@ export default function PaymentForm() {
         m: method,
         note,
       });
-      // Refetch bill detail to update state with server data
+      // Refetch bill detail dan daftar bills untuk update state dengan data server
       await fetchBillDetail(activePropertyId, billId);
+      if (fetchBills) {
+        await fetchBills(activePropertyId);
+      }
       navigate(-1);
     } catch (err) {
       console.error('Gagal membuat pembayaran:', err);
@@ -105,11 +108,12 @@ export default function PaymentForm() {
               Jumlah pembayaran
             </label>
             <input
+              type="text"
               inputMode="numeric"
               className="w-full border border-line bg-card rounded-[12px] p-[12px_14px] outline-none focus:outline-2 focus:outline-brand"
-              placeholder="Rp"
+              placeholder="Rp0"
               value={amt}
-              onChange={(e) => setAmt(e.target.value)}
+              onChange={(e) => setAmt(formatRupiah(e.target.value))}
             />
           </div>
 

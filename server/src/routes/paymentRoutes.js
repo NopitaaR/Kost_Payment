@@ -54,6 +54,8 @@ function calculateBillStatus(amount, totalPaid, dueDate) {
   }
   const now = new Date();
   const due = new Date(dueDate);
+  // Set batas jatuh tempo ke akhir hari (23:59:59.999)
+  due.setHours(23, 59, 59, 999);
   if (now > due) {
     return 'TERLAMBAT';
   }
@@ -99,9 +101,6 @@ router.post('/bills/:billId/payments', async (req, res) => {
         id: billId,
         propertyId,
       },
-      include: {
-        payments: true,
-      },
     });
 
     if (!bill) {
@@ -111,8 +110,12 @@ router.post('/bills/:billId/payments', async (req, res) => {
       });
     }
 
-    // 5. Hitung sisa tagihan saat ini
-    const currentTotalPaid = bill.payments.reduce((sum, p) => sum + p.amount, 0);
+    // 5. Hitung sisa tagihan saat ini menggunakan aggregate per billId
+    const aggBefore = await prisma.payment.aggregate({
+      where: { billId: bill.id },
+      _sum: { amount: true },
+    });
+    const currentTotalPaid = aggBefore._sum.amount || 0;
     const currentRemaining = bill.amount - currentTotalPaid;
 
     if (currentRemaining <= 0) {
@@ -130,10 +133,7 @@ router.post('/bills/:billId/payments', async (req, res) => {
       });
     }
 
-    // 6. Buat pembayaran dan update status Bill dalam transaction
-    const newTotalPaid = currentTotalPaid + roundedAmount;
-    const newStatus = calculateBillStatus(bill.amount, newTotalPaid, bill.dueDate);
-
+    // 6. Buat pembayaran dan update status Bill dalam transaction (hanya billId yang dituju)
     const result = await prisma.$transaction(async (tx) => {
       const payment = await tx.payment.create({
         data: {
@@ -145,35 +145,43 @@ router.post('/bills/:billId/payments', async (req, res) => {
         },
       });
 
+      // Hitung ulang total payment khusus untuk billId ini
+      const aggAfter = await tx.payment.aggregate({
+        where: { billId: bill.id },
+        _sum: { amount: true },
+      });
+      const newTotalPaid = aggAfter._sum.amount || 0;
+      const newStatus = calculateBillStatus(bill.amount, newTotalPaid, bill.dueDate);
+
       await tx.bill.update({
         where: { id: bill.id },
         data: { status: newStatus },
       });
 
-      return payment;
+      return { payment, newTotalPaid, newStatus };
     });
 
-    const finalRemaining = Math.max(0, bill.amount - newTotalPaid);
+    const finalRemaining = Math.max(0, bill.amount - result.newTotalPaid);
 
     return res.status(201).json({
       success: true,
       data: {
         payment: {
-          id: result.id,
-          billId: result.billId,
-          amount: result.amount,
-          method: result.method,
-          paymentDate: result.paymentDate,
-          notes: result.notes,
-          createdAt: result.createdAt,
-          updatedAt: result.updatedAt,
+          id: result.payment.id,
+          billId: result.payment.billId,
+          amount: result.payment.amount,
+          method: result.payment.method,
+          paymentDate: result.payment.paymentDate,
+          notes: result.payment.notes,
+          createdAt: result.payment.createdAt,
+          updatedAt: result.payment.updatedAt,
         },
         bill: {
           id: bill.id,
           amount: bill.amount,
-          totalPaid: newTotalPaid,
+          totalPaid: result.newTotalPaid,
           remaining: finalRemaining,
-          status: newStatus,
+          status: result.newStatus,
         },
       },
     });

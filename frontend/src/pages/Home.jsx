@@ -101,7 +101,6 @@ export default function Home() {
               </Card>
             ))}
 
-            <Button onClick={() => navigate('/penghuni/tambah')}>+ Tambah Penghuni</Button>
             <div className="flex gap-[10px]">
               <Button variant="ghost" onClick={() => navigate('/kamar/tambah')}>
                 + Tambah Kamar

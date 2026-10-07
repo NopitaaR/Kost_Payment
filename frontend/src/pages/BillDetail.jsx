@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useApp, rp, fd, paid, left, st } from '../context/AppContext';
+import { useApp, rp, fd, paid, left, st, isUUID } from '../context/AppContext';
 import { getPayments, deletePayment } from '../api/payments';
 import Header from '../components/Header';
 import { Card, Badge, Button } from '../components/UIComponents';
@@ -8,7 +8,7 @@ import { Card, Badge, Button } from '../components/UIComponents';
 export default function BillDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { bills, getTenantNameByRoom, activePropertyId, fetchBillDetail, confirmDialog, showToast } = useApp();
+  const { bills, getTenantNameByRoom, activePropertyId, fetchBillDetail, fetchBills, confirmDialog, showToast } = useApp();
 
   // Bill ID adalah UUID string, jangan dikonversi dengan Number().
   const billId = id;
@@ -17,14 +17,14 @@ export default function BillDetail() {
   const [paymentsError, setPaymentsError] = useState('');
 
   useEffect(() => {
-    if (activePropertyId && billId) {
+    if (activePropertyId && billId && isUUID(activePropertyId)) {
       fetchBillDetail(activePropertyId, billId);
       fetchPayments();
     }
   }, [activePropertyId, billId, fetchBillDetail]);
 
   const fetchPayments = async () => {
-    if (!activePropertyId || !billId) return;
+    if (!activePropertyId || !billId || !isUUID(activePropertyId)) return;
     setPaymentsLoading(true);
     setPaymentsError('');
     try {
@@ -62,6 +62,7 @@ export default function BillDetail() {
             showToast('Pembayaran dihapus');
             // Refresh detail tagihan dan daftar riwayat pembayaran
             await fetchBillDetail(activePropertyId, billId);
+            if (fetchBills) await fetchBills(activePropertyId);
             await fetchPayments();
           } else {
             showToast('Gagal menghapus pembayaran: ' + (res?.message || ''));

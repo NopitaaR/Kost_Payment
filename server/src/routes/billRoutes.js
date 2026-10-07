@@ -43,10 +43,15 @@ async function checkPropertyOwnership(req, res, next) {
 
 router.use(checkPropertyOwnership);
 
-// Helper: buat tanggal dengan hari yang di-clamp ke batas hari terakhir bulan
-// Contoh: clampDay(2026, 1, 31) → 2026-02-28 (bukan overflow ke 03-03)
+// Helper: buat tanggal UTC dengan hari yang di-clamp ke batas hari terakhir bulan
+function clampDayUTC(year, month, day) {
+  const lastDay = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+  const safeDay = Math.min(day, lastDay);
+  return new Date(Date.UTC(year, month, safeDay, 0, 0, 0, 0));
+}
+
+// Helper: buat tanggal dengan hari yang di-clamp ke batas hari terakhir bulan (local)
 function clampDay(year, month, day) {
-  // Hari terakhir bulan target: new Date(year, month+1, 0).getDate()
   const lastDay = new Date(year, month + 1, 0).getDate();
   const safeDay = Math.min(day, lastDay);
   return new Date(year, month, safeDay);
@@ -63,6 +68,8 @@ function calculateBillStatus(amount, totalPaid, dueDate) {
   }
   const now = new Date();
   const due = new Date(dueDate);
+  // Set batas jatuh tempo ke akhir hari (23:59:59.999)
+  due.setHours(23, 59, 59, 999);
   if (now > due) {
     return 'TERLAMBAT';
   }
@@ -322,12 +329,24 @@ router.post('/', async (req, res) => {
       orderBy: { startDate: 'desc' },
     });
 
-    // Pengecekan duplicate bill untuk kamar & periode yang persis sama
+    // Pengecekan duplicate bill untuk kamar & periode yang sama (identitas: roomId + periodStart + periodEnd)
     const existingBill = await prisma.bill.findFirst({
       where: {
         roomId: room.id,
-        periodStart: pStart,
-        periodEnd: pEnd,
+        OR: [
+          {
+            AND: [
+              { periodStart: pStart },
+              { periodEnd: pEnd },
+            ],
+          },
+          {
+            AND: [
+              { periodStart: { lte: pStart } },
+              { periodEnd: { gt: pStart } },
+            ],
+          },
+        ],
       },
     });
 
@@ -430,44 +449,72 @@ router.post('/generate', async (req, res) => {
       }
     }
 
+    const now = (req.body && req.body.simulatedDate)
+      ? new Date(req.body.simulatedDate)
+      : (req.query && req.query.date ? new Date(req.query.date) : new Date());
+
     for (const [roomId, mainOcc] of roomOccupanciesMap.entries()) {
       const room = mainOcc.room;
 
-      // Hitung siklus tagihan dari startDate hunian
+      // Tanggal masuk hunian dalam UTC
       const startDate = new Date(mainOcc.startDate);
-      const now = new Date();
-      const billingDay = startDate.getDate();
+      const sYear = startDate.getUTCFullYear();
+      const sMonth = startDate.getUTCMonth();
+      const sDay = startDate.getUTCDate();
 
-      // Buat tanggal periode berjalan dengan clamp hari ke batas bulan (fix overflow tgl 31)
-      // Contoh: masuk tgl 31, bulan Feb → clamp ke 28/29
-      let pStart = clampDay(now.getFullYear(), now.getMonth(), billingDay);
-      let pEnd = clampDay(now.getFullYear(), now.getMonth() + 1, billingDay);
-      let dDate = new Date(pEnd); // Due date sama dengan tanggal akhir periode
+      // Siklus k dimulai dari k = 0 (siklus pertama)
+      // Tagihan berikutnya baru boleh dibuat jika waktu sekarang sudah mencapai awal siklus tersebut (pStart <= now)
+      let k = 0;
+      while (true) {
+        const pStart = clampDayUTC(sYear, sMonth + k, sDay);
+        const pEnd = clampDayUTC(sYear, sMonth + k + 1, sDay);
+        const dDate = new Date(pStart); // Due date sama dengan tanggal mulai siklus
 
+        // Jika awal siklus ini belum tiba (masih di masa depan dari waktu sekarang), hentikan loop
+        if (pStart > now) {
+          break;
+        }
 
-      // Cek apakah bill untuk room + periodStart ini sudah ada
-      const existingBill = await prisma.bill.findFirst({
-        where: {
-          roomId: room.id,
-          periodStart: pStart,
-        },
-      });
-
-      if (!existingBill) {
-        const newBill = await prisma.bill.create({
-          data: {
-            propertyId,
+        // Cek apakah bill untuk room pada siklus ini sudah ada (identitas: roomId + periodStart + periodEnd)
+        const existingBill = await prisma.bill.findFirst({
+          where: {
             roomId: room.id,
-            occupancyId: mainOcc.id,
-            periodStart: pStart,
-            periodEnd: pEnd,
-            dueDate: dDate,
-            amount: room.price,
-            status: 'BELUM_BAYAR',
-            notes: `Tagihan otomatis periode ${pStart.toISOString().slice(0, 10)} - ${pEnd.toISOString().slice(0, 10)}`,
+            OR: [
+              {
+                AND: [
+                  { periodStart: pStart },
+                  { periodEnd: pEnd },
+                ],
+              },
+              { periodStart: pStart },
+              {
+                AND: [
+                  { periodStart: { lte: pStart } },
+                  { periodEnd: { gt: pStart } },
+                ],
+              },
+            ],
           },
         });
-        createdBills.push(newBill);
+
+        if (!existingBill) {
+          const newBill = await prisma.bill.create({
+            data: {
+              propertyId,
+              roomId: room.id,
+              occupancyId: mainOcc.id,
+              periodStart: pStart,
+              periodEnd: pEnd,
+              dueDate: dDate,
+              amount: room.price,
+              status: calculateBillStatus(room.price, 0, dDate),
+              notes: `Tagihan otomatis periode ${pStart.toISOString().slice(0, 10)} - ${pEnd.toISOString().slice(0, 10)}`,
+            },
+          });
+          createdBills.push(newBill);
+        }
+
+        k++;
       }
     }
 

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useApp } from '../context/AppContext';
+import { useApp, isUUID } from '../context/AppContext';
 import Header from '../components/Header';
 import { Card, Badge, Chip, FAB, Avatar } from '../components/UIComponents';
 import { SkeletonLoader, ErrorState, EmptyState } from '../components/StateComponents';
@@ -17,7 +17,7 @@ export default function Tenants() {
   const [filter, setFilter] = useState('Aktif'); // 'Aktif' | 'Keluar'
 
   const fetchTenants = useCallback(async () => {
-    if (!activePropertyId) return;
+    if (!activePropertyId || !isUUID(activePropertyId)) return;
     setLoading(true);
     setError(false);
     try {
@@ -39,6 +39,8 @@ export default function Tenants() {
       navigate('/pilih-rumah', { replace: true });
       return;
     }
+
+    if (!isUUID(activePropertyId)) return;
 
     const timer = setTimeout(() => {
       fetchTenants();
@@ -117,8 +119,6 @@ export default function Tenants() {
           </div>
         )}
       </div>
-
-      <FAB label="＋ Tambah" onClick={() => navigate('/penghuni/tambah')} />
     </div>
   );
 }

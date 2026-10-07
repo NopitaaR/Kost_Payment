@@ -94,6 +94,13 @@ function handleKtpUpload(req, res, next) {
   });
 }
 
+// Helper: buat tanggal UTC dengan hari yang di-clamp ke batas hari terakhir bulan
+function clampDayUTC(year, month, day) {
+  const lastDay = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+  const safeDay = Math.min(day, lastDay);
+  return new Date(Date.UTC(year, month, safeDay, 0, 0, 0, 0));
+}
+
 // Helper: sanitize error message supaya tidak membocorkan detail internal di production
 const safeError = (err) => process.env.NODE_ENV === 'production' ? undefined : (err && err.message);
 
@@ -280,7 +287,16 @@ router.post('/', async (req, res) => {
       });
     }
 
-    // Transaction pembuatan tenant + occupancy
+    // Hitung periode tagihan pertama (1 bulan penuh di awal, jatuh tempo = tanggal masuk)
+    const sDate = new Date(startDate);
+    const sYear = sDate.getUTCFullYear();
+    const sMonth = sDate.getUTCMonth();
+    const sDay = sDate.getUTCDate();
+    const pStart = clampDayUTC(sYear, sMonth, sDay);
+    const pEnd = clampDayUTC(sYear, sMonth + 1, sDay);
+    const dueDate = new Date(pStart);
+
+    // Transaction pembuatan tenant + occupancy + tagihan pertama otomatis
     const result = await prisma.$transaction(async (tx) => {
       const newTenant = await tx.tenant.create({
         data: {
@@ -312,7 +328,47 @@ router.post('/', async (req, res) => {
         });
       }
 
-      return { newTenant, newOccupancy };
+      // Business Rule: ONE ROOM = ONE BILL PER PERIOD
+      // Cek apakah tagihan untuk kamar dan periode ini sudah ada (identitas: roomId + periodStart + periodEnd)
+      const existingBill = await tx.bill.findFirst({
+        where: {
+          roomId: room.id,
+          OR: [
+            {
+              AND: [
+                { periodStart: pStart },
+                { periodEnd: pEnd },
+              ],
+            },
+            { periodStart: pStart },
+            {
+              AND: [
+                { periodStart: { lte: pStart } },
+                { periodEnd: { gt: pStart } },
+              ],
+            },
+          ],
+        },
+      });
+
+      let firstBill = existingBill;
+      if (!existingBill) {
+        firstBill = await tx.bill.create({
+          data: {
+            propertyId,
+            roomId: room.id,
+            occupancyId: newOccupancy.id,
+            periodStart: pStart,
+            periodEnd: pEnd,
+            dueDate,
+            amount: room.price,
+            status: 'BELUM_BAYAR',
+            notes: `Tagihan pertama periode ${pStart.toISOString().slice(0, 10)} - ${pEnd.toISOString().slice(0, 10)}`,
+          },
+        });
+      }
+
+      return { newTenant, newOccupancy, firstBill };
     });
 
     return res.status(201).json({
@@ -332,6 +388,7 @@ router.post('/', async (req, res) => {
         },
         currentRoomPrice: room.price,
         currentOccupancyId: result.newOccupancy.id,
+        firstBillId: result.firstBill ? result.firstBill.id : null,
         createdAt: result.newTenant.createdAt,
         updatedAt: result.newTenant.updatedAt,
       },

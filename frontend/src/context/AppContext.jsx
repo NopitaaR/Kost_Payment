@@ -31,7 +31,9 @@ export const left = (b) => {
 export const st = (b) => {
   if (b.status !== undefined) return b.status;
   if (paid(b) >= (b.amt || 0)) return 'LUNAS';
-  if (new Date((b.due || 0)) < TODAY) return 'TERLAMBAT';
+  const due = new Date(b.due || 0);
+  due.setHours(23, 59, 59, 999);
+  if (due < TODAY) return 'TERLAMBAT';
   if (paid(b) > 0) return 'SEBAGIAN';
   return 'BELUM_BAYAR';
 };
@@ -51,6 +53,28 @@ export const formatPeriod = (startDateStr, endDateStr) => {
     return `${day} ${month} ${year}`;
   };
   return `${formatDate(start)} – ${formatDate(end)}`;
+};
+
+// Helper: validasi format UUID v4
+export const isUUID = (str) =>
+  typeof str === 'string' &&
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str.trim());
+
+// Helper: formatter input uang Rupiah Indonesia (contoh: 300000 -> "Rp300.000")
+export const formatRupiah = (val) => {
+  if (val === null || val === undefined || val === '') return '';
+  const digits = String(val).replace(/\D/g, '');
+  if (!digits) return '';
+  const num = parseInt(digits, 10);
+  if (isNaN(num)) return '';
+  return 'Rp' + num.toLocaleString('id-ID');
+};
+
+// Helper: parser input Rupiah ke integer murni (contoh: "Rp300.000" -> 300000)
+export const parseRupiah = (val) => {
+  if (!val) return 0;
+  const digits = String(val).replace(/\D/g, '');
+  return parseInt(digits, 10) || 0;
 };
 
 export function AppProvider({ children }) {
@@ -351,7 +375,11 @@ export function AppProvider({ children }) {
         await propertiesApi.updatePropertyName(propertyId, newName);
       }
       setHouses((prev) =>
-        prev.map((h) => (h._id === propertyId ? { ...h, n: newName } : h))
+        prev.map((h) =>
+          h.id === propertyId || h._id === propertyId
+            ? { ...h, n: newName, name: newName }
+            : h
+        )
       );
       showToast('Nama rumah disimpan');
     } catch (err) {
@@ -361,28 +389,28 @@ export function AppProvider({ children }) {
   };
 
   // Fetch bills dari API berdasarkan activePropertyId
-  const fetchBills = async () => {
-    if (!activePropertyId) {
+  const fetchBills = async (overrideId) => {
+    const propertyId = overrideId || activePropertyId;
+    if (!propertyId || !isUUID(propertyId)) {
       setBills([]);
       return;
     }
-    const propertyId = activePropertyId;
     try {
       const data = await billsApi.getBills(propertyId);
       // api/bills.js#getBills sudah mengembalikan { success, data } dalam bentuk UI
       // (room = nomor kamar string, amt, due, per, pay). Jangan transform ulang di sini.
       if (data && data.success) {
-        if (propertyId === activePropertyId) {
+        if (propertyId === (overrideId || activePropertyId)) {
           setBills(data.data);
         }
       } else {
-        if (propertyId === activePropertyId) {
+        if (propertyId === (overrideId || activePropertyId)) {
           setBills([]);
         }
       }
     } catch (err) {
       console.error('Gagal mengambil tagihan:', err);
-      if (activePropertyId === propertyId) {
+      if ((overrideId || activePropertyId) === propertyId) {
         setBills([]);
       }
     }
@@ -391,7 +419,7 @@ export function AppProvider({ children }) {
   // fetchBillDetail distabilkan dengan useCallback agar identitasnya tidak berubah
   // setiap render; kalau tidak, effect di BillDetail akan memicu fetch tanpa henti.
   const fetchBillDetail = useCallback(async (propertyId, billId) => {
-    if (!propertyId || !billId) return;
+    if (!propertyId || !billId || !isUUID(propertyId)) return;
     try {
       const data = await billsApi.getBill(propertyId, billId);
       if (data && data.success) {
@@ -421,8 +449,10 @@ export function AppProvider({ children }) {
       if (Array.isArray(data)) {
         // Transform API property objects to match expected shape for houses state
         // API: [{ id, name, totalRooms, filledRooms, emptyRooms, activeTenants }]
-        // State expects: [{ n: name, k: totalRooms, t: activeTenants }]
+        // State expects: [{ id, name, n: name, k: totalRooms, t: activeTenants }]
         const transformed = data.map((property) => ({
+          id: property.id,
+          name: property.name,
           n: property.name,
           k: property.totalRooms,
           t: property.activeTenants,
@@ -434,22 +464,25 @@ export function AppProvider({ children }) {
           _activeTenants: property.activeTenants,
         }));
         setHouses(transformed);
+        return transformed;
       } else {
         setHouses([]);
+        return [];
       }
     } catch (err) {
       console.error('Gagal mengambil daftar rumah:', err);
       setHouses([]);
+      return [];
     }
   };
 
   // Fetch rooms dari API berdasarkan activePropertyId
-  const fetchRooms = async () => {
-    if (!activePropertyId) {
+  const fetchRooms = async (overrideId) => {
+    const propertyId = overrideId || activePropertyId;
+    if (!propertyId || !isUUID(propertyId)) {
       setRooms([]);
       return;
     }
-    const propertyId = activePropertyId;
     try {
       const data = await roomsApi.getRooms(propertyId);
       if (data && data.success !== false) { // API returns array directly or {success, data}
@@ -463,29 +496,29 @@ export function AppProvider({ children }) {
           _id: room.id,
           _tenant: room.tenant, // Active tenant if any
         }));
-        if (propertyId === activePropertyId) {
+        if (propertyId === (overrideId || activePropertyId)) {
           setRooms(transformed);
         }
       } else {
-        if (propertyId === activePropertyId) {
+        if (propertyId === (overrideId || activePropertyId)) {
           setRooms([]);
         }
       }
     } catch (err) {
       console.error('Gagal mengambil daftar kamar:', err);
-      if (activePropertyId === propertyId) {
+      if ((overrideId || activePropertyId) === propertyId) {
         setRooms([]);
       }
     }
   };
 
   // Fetch tenants dari API berdasarkan activePropertyId
-  const fetchTenants = async () => {
-    if (!activePropertyId) {
+  const fetchTenants = async (overrideId) => {
+    const propertyId = overrideId || activePropertyId;
+    if (!propertyId || !isUUID(propertyId)) {
       setTenants([]);
       return;
     }
-    const propertyId = activePropertyId;
     try {
       const data = await tenantsApi.getTenants(propertyId);
       if (data && data.success !== false) { // API returns array directly or {success, data}
@@ -504,17 +537,17 @@ export function AppProvider({ children }) {
           status: tenant.status,
           ktp: tenant.ktpPhoto || null,
         }));
-        if (propertyId === activePropertyId) {
+        if (propertyId === (overrideId || activePropertyId)) {
           setTenants(transformed);
         }
       } else {
-        if (propertyId === activePropertyId) {
+        if (propertyId === (overrideId || activePropertyId)) {
           setTenants([]);
         }
       }
     } catch (err) {
       console.error('Gagal mengambil daftar penghuni:', err);
-      if (activePropertyId === propertyId) {
+      if ((overrideId || activePropertyId) === propertyId) {
         setTenants([]);
       }
     }
@@ -524,40 +557,65 @@ export function AppProvider({ children }) {
   useEffect(() => {
     if (!isLoggedIn) return;
     setMode('loading');
-    // Reset state
-    setHouses([]);
-    setRooms([]);
-    setTenants([]);
-    setBills([]);
 
-    // We'll collect promises for the fetches we want to wait for
-    const promises = [];
+    let cancelled = false;
 
-    // Always fetch houses
-    promises.push(fetchHouses());
+    const syncData = async () => {
+      try {
+        const fetchedHouses = await fetchHouses();
+        if (cancelled) return;
 
-    // If we have an activePropertyId, fetch rooms, tenants, and bills
-    if (activePropertyId) {
-      promises.push(fetchRooms());
-      promises.push(fetchTenants());
-      promises.push(fetchBills());
-    }
+        // Migrasi & validasi activePropertyId (kompatibilitas jika localStorage masih menyimpan nama seperti "Rumah 1")
+        const storedProp = localStorage.getItem('kost.activePropertyId') || activePropertyId;
+        let resolvedId = null;
 
-    // Wait for all fetches to complete
-    Promise.allSettled(promises)
-      .then((results) => {
-        // If any of the promises rejected, set mode to error
-        const hasError = results.some((result) => result.status === 'rejected');
-        if (hasError) {
-          setMode('error');
-        } else {
-          setMode('normal');
+        if (storedProp && Array.isArray(fetchedHouses) && fetchedHouses.length > 0) {
+          // 1. Cek apakah storedProp cocok dengan property.id (UUID)
+          const matchById = fetchedHouses.find((h) => (h.id || h._id) === storedProp);
+          if (matchById) {
+            resolvedId = matchById.id || matchById._id;
+            if (activePropertyId !== resolvedId) {
+              setActivePropertyId(resolvedId);
+            }
+          } else {
+            // 2. Cek apakah storedProp berupa nama (misal "Rumah 1")
+            const matchByName = fetchedHouses.find((h) => (h.name || h.n) === storedProp);
+            if (matchByName) {
+              resolvedId = matchByName.id || matchByName._id;
+              // Migrasi localStorage dan state ke UUID
+              setActivePropertyId(resolvedId);
+            } else {
+              // 3. Property tidak ditemukan di database
+              setActivePropertyId(null);
+            }
+          }
         }
-      })
-      .catch(() => {
-        // This should not happen because allSettled doesn't reject, but just in case
-        setMode('error');
-      });
+
+        // Fetch rooms, tenants, bills jika resolvedId valid
+        if (resolvedId && isUUID(resolvedId)) {
+          await Promise.allSettled([
+            fetchRooms(resolvedId),
+            fetchTenants(resolvedId),
+            fetchBills(resolvedId),
+          ]);
+        } else {
+          setRooms([]);
+          setTenants([]);
+          setBills([]);
+        }
+
+        if (!cancelled) setMode('normal');
+      } catch (err) {
+        console.error('Gagal sinkronisasi data:', err);
+        if (!cancelled) setMode('error');
+      }
+    };
+
+    syncData();
+
+    return () => {
+      cancelled = true;
+    };
   }, [activePropertyId, isLoggedIn]);
 
   return (
@@ -573,8 +631,28 @@ export function AppProvider({ children }) {
         activePropertyId,
         setActivePropertyId,
         // selectedHouse is computed from houses and activePropertyId
-        selectedHouse: houses.find((h) => h._id === activePropertyId)?.n || '',
-        setSelectedHouse: (id) => setActivePropertyId(id), // For compatibility, we map to setActivePropertyId
+        selectedHouse:
+          houses.find((h) => (h.id || h._id) === activePropertyId)?.name ||
+          houses.find((h) => (h.id || h._id) === activePropertyId)?.n ||
+          '',
+        setSelectedHouse: (val) => {
+          if (!val) {
+            setActivePropertyId(null);
+            return;
+          }
+          if (typeof val === 'object' && val.id) {
+            setActivePropertyId(val.id);
+            return;
+          }
+          if (isUUID(val)) {
+            setActivePropertyId(val);
+            return;
+          }
+          const found = houses.find((h) => (h.name || h.n) === val);
+          if (found) {
+            setActivePropertyId(found.id || found._id);
+          }
+        },
         houses,
         setHouses,
         rooms,

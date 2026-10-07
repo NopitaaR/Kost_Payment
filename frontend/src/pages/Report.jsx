@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useApp, rp, fd, left, st } from '../context/AppContext';
+import { useApp, rp, fd, left, st, isUUID } from '../context/AppContext';
 import { getPropertyPayments } from '../api/payments';
 import Header from '../components/Header';
 import { Card, Chip } from '../components/UIComponents';
@@ -65,7 +65,7 @@ export default function Report() {
 
   // Fetch semua payments dari API ketika activePropertyId berubah
   useEffect(() => {
-    if (!activePropertyId) {
+    if (!activePropertyId || !isUUID(activePropertyId)) {
       setPayments([]);
       return;
     }
@@ -74,7 +74,7 @@ export default function Report() {
   }, [activePropertyId]);
 
   const fetchPayments = async () => {
-    if (!activePropertyId) return;
+    if (!activePropertyId || !isUUID(activePropertyId)) return;
     setPaymentsLoading(true);
     setPaymentsError('');
     try {
