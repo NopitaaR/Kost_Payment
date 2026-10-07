@@ -1,14 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useApp, rp, fd, paid, left, st } from '../context/AppContext';
-import { getPayments } from '../api/payments';
+import { getPayments, deletePayment } from '../api/payments';
 import Header from '../components/Header';
 import { Card, Badge, Button } from '../components/UIComponents';
 
 export default function BillDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { bills, getTenantNameByRoom, activePropertyId, fetchBillDetail } = useApp();
+  const { bills, getTenantNameByRoom, activePropertyId, fetchBillDetail, confirmDialog, showToast } = useApp();
 
   // Bill ID adalah UUID string, jangan dikonversi dengan Number().
   const billId = id;
@@ -45,6 +45,33 @@ export default function BillDetail() {
     } finally {
       setPaymentsLoading(false);
     }
+  };
+
+  const handleDeletePayment = (payment) => {
+    const paymentId = payment.id;
+    if (!paymentId) return;
+
+    confirmDialog(
+      'Hapus pembayaran?',
+      `Pembayaran ${rp(payment.amount || payment.amt)} (${payment.method || payment.m}, ${fd(payment.paymentDate || payment.d)}) akan dihapus. Sisa tagihan akan bertambah dan status tagihan bisa berubah.`,
+      'Ya, hapus',
+      async () => {
+        try {
+          const res = await deletePayment(activePropertyId, billId, paymentId);
+          if (res && res.success) {
+            showToast('Pembayaran dihapus');
+            // Refresh detail tagihan dan daftar riwayat pembayaran
+            await fetchBillDetail(activePropertyId, billId);
+            await fetchPayments();
+          } else {
+            showToast('Gagal menghapus pembayaran: ' + (res?.message || ''));
+          }
+        } catch (err) {
+          console.error('Error delete payment:', err);
+          showToast('Gagal menghapus pembayaran: ' + (err.message || ''));
+        }
+      }
+    );
   };
 
   const bill = bills.find((b) => String(b.id) === String(billId));
@@ -119,7 +146,17 @@ export default function BillDetail() {
                     <div className="font-bold text-ink">{fd(p.paymentDate || p.d)}</div>
                     <div className="text-[13px] text-mute">{p.method || p.m}</div>
                   </div>
-                  <div className="font-bold text-ink">{rp(p.amt)}</div>
+                  <div className="flex items-center gap-3">
+                    <div className="font-bold text-ink">{rp(p.amt)}</div>
+                    <button
+                      type="button"
+                      aria-label="Hapus pembayaran"
+                      className="p-1 text-mute hover:text-bad active:text-bad text-base cursor-pointer border-0 bg-transparent"
+                      onClick={() => handleDeletePayment(p)}
+                    >
+                      🗑
+                    </button>
+                  </div>
                 </div>
                 {p.notes && (
                   <div className="text-[13px] text-mute mt-1">{p.notes}</div>

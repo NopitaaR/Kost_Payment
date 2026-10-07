@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useApp, rp, fd, left, paid, st } from '../context/AppContext';
-import { getPropertyPayments } from '../api/payments';
+import { getPropertyPayments, deletePayment } from '../api/payments';
 import { createBill, generateBills } from '../api/bills';
 import Header from '../components/Header';
 import { Card, Badge, Chip, Button } from '../components/UIComponents';
@@ -22,6 +22,8 @@ export default function Finance() {
     closeSheet,
     getTenantNameByRoom,
     activePropertyId,
+    confirmDialog,
+    showToast,
     mode,
     setMode,
   } = useApp();
@@ -85,6 +87,34 @@ export default function Finance() {
     } finally {
       setPaymentsLoading(false);
     }
+  };
+
+  const handleDeletePayment = (payment) => {
+    const paymentId = payment.id;
+    const billId = payment.billId;
+    if (!paymentId || !billId || !activePropertyId) return;
+
+    confirmDialog(
+      'Hapus pembayaran?',
+      `Pembayaran ${rp(payment.amount || payment.amt)} (${payment.method || payment.m}, ${fd(payment.paymentDate || payment.d)}) untuk Kamar ${payment.roomNumber || '-'} akan dihapus. Sisa tagihan akan bertambah dan status tagihan bisa berubah.`,
+      'Ya, hapus',
+      async () => {
+        try {
+          const res = await deletePayment(activePropertyId, billId, paymentId);
+          if (res && res.success) {
+            showToast('Pembayaran dihapus');
+            // Refresh daftar pembayaran dan tagihan
+            await fetchPayments();
+            await fetchBills();
+          } else {
+            showToast('Gagal menghapus pembayaran: ' + (res?.message || ''));
+          }
+        } catch (err) {
+          console.error('Error delete payment:', err);
+          showToast('Gagal menghapus pembayaran: ' + (err.message || ''));
+        }
+      }
+    );
   };
 
   const handleGenerateBills = async () => {
@@ -532,7 +562,17 @@ export default function Finance() {
                               {fd(p.paymentDate)} · {p.method || p.m}
                             </div>
                           </div>
-                          <div className="font-bold text-ink">{rp(p.amt)}</div>
+                          <div className="flex items-center gap-3">
+                            <div className="font-bold text-ink">{rp(p.amt)}</div>
+                            <button
+                              type="button"
+                              aria-label="Hapus pembayaran"
+                              className="p-1 text-mute hover:text-bad active:text-bad text-base cursor-pointer border-0 bg-transparent"
+                              onClick={() => handleDeletePayment(p)}
+                            >
+                              🗑
+                            </button>
+                          </div>
                         </div>
                         {p.notes && (
                           <div className="text-[13px] text-mute mt-1">{p.notes}</div>

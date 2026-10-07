@@ -235,6 +235,92 @@ router.get('/bills/:billId/payments', async (req, res) => {
   }
 });
 
+// DELETE /api/v1/properties/:propertyId/bills/:billId/payments/:paymentId
+// Menghapus/membatalkan pembayaran dan menghitung ulang total dibayar, sisa, serta status tagihan
+router.delete('/bills/:billId/payments/:paymentId', async (req, res) => {
+  try {
+    const { propertyId, billId, paymentId } = req.params;
+
+    // 1. Cari bill dan pastikan milik propertyId ini
+    const bill = await prisma.bill.findFirst({
+      where: {
+        id: billId,
+        propertyId,
+      },
+    });
+
+    if (!bill) {
+      return res.status(404).json({
+        success: false,
+        message: 'Tagihan tidak ditemukan pada rumah ini.',
+      });
+    }
+
+    // 2. Cari payment dan pastikan milik billId ini
+    const payment = await prisma.payment.findFirst({
+      where: {
+        id: paymentId,
+        billId: bill.id,
+      },
+    });
+
+    if (!payment) {
+      return res.status(404).json({
+        success: false,
+        message: 'Pembayaran tidak ditemukan pada tagihan ini.',
+      });
+    }
+
+    // 3. Jalankan transaksi: hapus payment dan rekalkulasi bill
+    const updatedBill = await prisma.$transaction(async (tx) => {
+      // Hapus payment
+      await tx.payment.delete({
+        where: { id: paymentId },
+      });
+
+      // Ambil seluruh payment yang masih tersisa untuk bill ini
+      const remainingPayments = await tx.payment.findMany({
+        where: { billId: bill.id },
+      });
+
+      const newTotalPaid = remainingPayments.reduce((sum, p) => sum + p.amount, 0);
+      const newStatus = calculateBillStatus(bill.amount, newTotalPaid, bill.dueDate);
+
+      const updated = await tx.bill.update({
+        where: { id: bill.id },
+        data: { status: newStatus },
+      });
+
+      return {
+        ...updated,
+        totalPaid: newTotalPaid,
+        remaining: Math.max(0, updated.amount - newTotalPaid),
+      };
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: 'Pembayaran berhasil dihapus.',
+      data: {
+        deletedPaymentId: paymentId,
+        bill: {
+          id: updatedBill.id,
+          amount: updatedBill.amount,
+          totalPaid: updatedBill.totalPaid,
+          remaining: updatedBill.remaining,
+          status: updatedBill.status,
+        },
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: 'Gagal menghapus pembayaran.',
+      error: safeError(error),
+    });
+  }
+});
+
 // GET /api/v1/properties/:propertyId/payments
 // Mengambil daftar seluruh pembayaran pada satu rumah
 router.get('/payments', async (req, res) => {

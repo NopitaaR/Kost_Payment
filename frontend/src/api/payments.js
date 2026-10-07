@@ -49,3 +49,8 @@ export const getPropertyPayments = (propertyId) => {
     return response;
   });
 };
+
+// Delete / cancel a payment
+export const deletePayment = (propertyId, billId, paymentId) => {
+  return api.delete(`/properties/${propertyId}/bills/${billId}/payments/${paymentId}`);
+};
