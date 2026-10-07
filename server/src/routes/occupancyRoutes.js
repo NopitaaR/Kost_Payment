@@ -2,6 +2,9 @@ import express from 'express';
 import { PrismaClient } from '@prisma/client';
 import { authenticateToken } from '../middleware/authMiddleware.js';
 
+// Helper: sanitize error message supaya tidak membocorkan detail internal di production
+const safeError = (err) => process.env.NODE_ENV === 'production' ? undefined : (err && err.message);
+
 const router = express.Router({ mergeParams: true });
 const prisma = new PrismaClient();
 
@@ -33,7 +36,7 @@ async function checkPropertyOwnership(req, res, next) {
     return res.status(500).json({
       success: false,
       message: 'Gagal memverifikasi kepemilikan rumah.',
-      error: error.message,
+      error: safeError(error),
     });
   }
 }
@@ -115,7 +118,7 @@ router.get('/', async (req, res) => {
     return res.status(500).json({
       success: false,
       message: 'Gagal mengambil data histori hunian.',
-      error: error.message,
+      error: safeError(error),
     });
   }
 });

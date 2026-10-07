@@ -2,6 +2,9 @@ import express from 'express';
 import { PrismaClient } from '@prisma/client';
 import { authenticateToken } from '../middleware/authMiddleware.js';
 
+// Helper: sanitize error message supaya tidak membocorkan detail internal di production
+const safeError = (err) => process.env.NODE_ENV === 'production' ? undefined : (err && err.message);
+
 const router = express.Router({ mergeParams: true });
 const prisma = new PrismaClient();
 
@@ -34,7 +37,7 @@ async function checkPropertyOwnership(req, res, next) {
     return res.status(500).json({
       success: false,
       message: 'Gagal memverifikasi kepemilikan rumah.',
-      error: error.message,
+      error: safeError(error),
     });
   }
 }
@@ -99,7 +102,7 @@ router.get('/', async (req, res) => {
     return res.status(500).json({
       success: false,
       message: 'Gagal mengambil daftar kamar.',
-      error: error.message,
+      error: safeError(error),
     });
   }
 });
@@ -177,7 +180,7 @@ router.post('/', async (req, res) => {
     return res.status(500).json({
       success: false,
       message: 'Gagal menambah kamar.',
-      error: error.message,
+      error: safeError(error),
     });
   }
 });
@@ -265,7 +268,7 @@ router.get('/:roomId', async (req, res) => {
     return res.status(500).json({
       success: false,
       message: 'Gagal mengambil detail kamar.',
-      error: error.message,
+      error: safeError(error),
     });
   }
 });
@@ -363,7 +366,7 @@ router.put('/:roomId', async (req, res) => {
     return res.status(500).json({
       success: false,
       message: 'Gagal mengedit kamar.',
-      error: error.message,
+      error: safeError(error),
     });
   }
 });
@@ -415,7 +418,7 @@ router.delete('/:roomId', async (req, res) => {
     return res.status(500).json({
       success: false,
       message: 'Gagal menghapus kamar.',
-      error: error.message,
+      error: safeError(error),
     });
   }
 });

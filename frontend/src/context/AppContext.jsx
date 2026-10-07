@@ -9,7 +9,7 @@ import * as propertiesApiFromServer from '../api/properties'; // alias to avoid 
 
 const AppContext = createContext();
 
-export const TODAY = new Date('2026-10-04');
+export const TODAY = new Date();
 
 export const rp = (n) => 'Rp' + (Number(n) || 0).toLocaleString('id-ID');
 

@@ -4,6 +4,9 @@ import jwt from 'jsonwebtoken';
 import { PrismaClient } from '@prisma/client';
 import { authenticateToken } from '../middleware/authMiddleware.js';
 
+// Helper: sanitize error message supaya tidak membocorkan detail internal di production
+const safeError = (err) => process.env.NODE_ENV === 'production' ? undefined : (err && err.message);
+
 const router = express.Router();
 const prisma = new PrismaClient();
 
@@ -75,7 +78,7 @@ router.post('/login', async (req, res) => {
     return res.status(500).json({
       success: false,
       message: 'Terjadi kesalahan pada server saat login.',
-      error: error.message,
+      error: safeError(error),
     });
   }
 });
@@ -123,7 +126,7 @@ router.put('/profile', authenticateToken, async (req, res) => {
     return res.status(500).json({
       success: false,
       message: 'Gagal memperbarui profil.',
-      error: error.message,
+      error: safeError(error),
     });
   }
 });
@@ -188,7 +191,7 @@ router.post('/change-password', authenticateToken, async (req, res) => {
     return res.status(500).json({
       success: false,
       message: 'Gagal mengganti password.',
-      error: error.message,
+      error: safeError(error),
     });
   }
 });

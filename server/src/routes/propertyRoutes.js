@@ -7,6 +7,9 @@ import occupancyRoutes from './occupancyRoutes.js';
 import billRoutes from './billRoutes.js';
 import paymentRoutes from './paymentRoutes.js';
 
+// Helper: sanitize error message supaya tidak membocorkan detail internal di production
+const safeError = (err) => process.env.NODE_ENV === 'production' ? undefined : (err && err.message);
+
 const router = express.Router();
 const prisma = new PrismaClient();
 
@@ -59,7 +62,7 @@ router.put('/:propertyId/name', authenticateToken, async (req, res) => {
     return res.status(500).json({
       success: false,
       message: 'Gagal memperbarui nama rumah.',
-      error: error.message,
+      error: safeError(error),
     });
   }
 });
@@ -121,7 +124,7 @@ router.get('/', async (req, res) => {
     return res.status(500).json({
       success: false,
       message: 'Gagal mengambil daftar rumah.',
-      error: error.message,
+      error: safeError(error),
     });
   }
 });
@@ -213,7 +216,7 @@ router.get('/:id', async (req, res) => {
     return res.status(500).json({
       success: false,
       message: 'Gagal mengambil detail rumah.',
-      error: error.message,
+      error: safeError(error),
     });
   }
 });

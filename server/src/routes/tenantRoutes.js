@@ -94,6 +94,9 @@ function handleKtpUpload(req, res, next) {
   });
 }
 
+// Helper: sanitize error message supaya tidak membocorkan detail internal di production
+const safeError = (err) => process.env.NODE_ENV === 'production' ? undefined : (err && err.message);
+
 const router = express.Router({ mergeParams: true });
 const prisma = new PrismaClient();
 
@@ -125,7 +128,7 @@ async function checkPropertyOwnership(req, res, next) {
     return res.status(500).json({
       success: false,
       message: 'Gagal memverifikasi kepemilikan rumah.',
-      error: error.message,
+      error: safeError(error),
     });
   }
 }
@@ -225,7 +228,7 @@ router.get('/', async (req, res) => {
     return res.status(500).json({
       success: false,
       message: 'Gagal mengambil daftar penghuni.',
-      error: error.message,
+      error: safeError(error),
     });
   }
 });
@@ -337,7 +340,7 @@ router.post('/', async (req, res) => {
     return res.status(500).json({
       success: false,
       message: 'Gagal menambah penghuni.',
-      error: error.message,
+      error: safeError(error),
     });
   }
 });
@@ -359,7 +362,7 @@ router.post('/upload-ktp', handleKtpUpload, async (req, res) => {
     return res.status(500).json({
       success: false,
       message: 'Gagal mengunggah file KTP.',
-      error: error.message,
+      error: safeError(error),
     });
   }
 });
@@ -450,7 +453,7 @@ router.get('/:tenantId', async (req, res) => {
     return res.status(500).json({
       success: false,
       message: 'Gagal mengambil detail penghuni.',
-      error: error.message,
+      error: safeError(error),
     });
   }
 });
@@ -499,7 +502,7 @@ router.get('/:tenantId/ktp', async (req, res) => {
     return res.status(500).json({
       success: false,
       message: 'Gagal mengambil foto KTP.',
-      error: error.message,
+      error: safeError(error),
     });
   }
 });
@@ -550,7 +553,7 @@ router.post('/:tenantId/ktp', handleKtpUpload, async (req, res) => {
     return res.status(500).json({
       success: false,
       message: 'Gagal mengunggah foto KTP.',
-      error: error.message,
+      error: safeError(error),
     });
   }
 });
@@ -785,7 +788,7 @@ router.post('/:tenantId/move', async (req, res) => {
     return res.status(500).json({
       success: false,
       message: 'Gagal memindahkan penghuni.',
-      error: error.message,
+      error: safeError(error),
     });
   }
 });
@@ -878,7 +881,7 @@ router.post('/:tenantId/exit', async (req, res) => {
     return res.status(500).json({
       success: false,
       message: 'Gagal mencatat penghuni keluar.',
-      error: error.message,
+      error: safeError(error),
     });
   }
 });

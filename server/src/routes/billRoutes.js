@@ -2,6 +2,9 @@ import express from 'express';
 import { PrismaClient } from '@prisma/client';
 import { authenticateToken } from '../middleware/authMiddleware.js';
 
+// Helper: sanitize error message supaya tidak membocorkan detail internal di production
+const safeError = (err) => process.env.NODE_ENV === 'production' ? undefined : (err && err.message);
+
 const router = express.Router({ mergeParams: true });
 const prisma = new PrismaClient();
 
@@ -33,12 +36,21 @@ async function checkPropertyOwnership(req, res, next) {
     return res.status(500).json({
       success: false,
       message: 'Gagal memverifikasi kepemilikan rumah.',
-      error: error.message,
+      error: safeError(error),
     });
   }
 }
 
 router.use(checkPropertyOwnership);
+
+// Helper: buat tanggal dengan hari yang di-clamp ke batas hari terakhir bulan
+// Contoh: clampDay(2026, 1, 31) → 2026-02-28 (bukan overflow ke 03-03)
+function clampDay(year, month, day) {
+  // Hari terakhir bulan target: new Date(year, month+1, 0).getDate()
+  const lastDay = new Date(year, month + 1, 0).getDate();
+  const safeDay = Math.min(day, lastDay);
+  return new Date(year, month, safeDay);
+}
 
 // Helper function untuk menghitung status tagihan secara tepat
 function calculateBillStatus(amount, totalPaid, dueDate) {
@@ -155,7 +167,7 @@ router.get('/', async (req, res) => {
     return res.status(500).json({
       success: false,
       message: 'Gagal mengambil daftar tagihan.',
-      error: error.message,
+      error: safeError(error),
     });
   }
 });
@@ -259,7 +271,7 @@ router.get('/:billId', async (req, res) => {
     return res.status(500).json({
       success: false,
       message: 'Gagal mengambil detail tagihan.',
-      error: error.message,
+      error: safeError(error),
     });
   }
 });
@@ -377,7 +389,7 @@ router.post('/', async (req, res) => {
     return res.status(500).json({
       success: false,
       message: 'Gagal membuat tagihan.',
-      error: error.message,
+      error: safeError(error),
     });
   }
 });
@@ -424,11 +436,14 @@ router.post('/generate', async (req, res) => {
       // Hitung siklus tagihan dari startDate hunian
       const startDate = new Date(mainOcc.startDate);
       const now = new Date();
+      const billingDay = startDate.getDate();
 
-      // Buat tanggal periode berjalan (misal startDate = 20 Jan 2026, sekarang Oct 2026)
-      let pStart = new Date(now.getFullYear(), now.getMonth(), startDate.getDate());
-      let pEnd = new Date(now.getFullYear(), now.getMonth() + 1, startDate.getDate());
+      // Buat tanggal periode berjalan dengan clamp hari ke batas bulan (fix overflow tgl 31)
+      // Contoh: masuk tgl 31, bulan Feb → clamp ke 28/29
+      let pStart = clampDay(now.getFullYear(), now.getMonth(), billingDay);
+      let pEnd = clampDay(now.getFullYear(), now.getMonth() + 1, billingDay);
       let dDate = new Date(pEnd); // Due date sama dengan tanggal akhir periode
+
 
       // Cek apakah bill untuk room + periodStart ini sudah ada
       const existingBill = await prisma.bill.findFirst({
@@ -468,7 +483,7 @@ router.post('/generate', async (req, res) => {
     return res.status(500).json({
       success: false,
       message: 'Gagal mengenerate tagihan.',
-      error: error.message,
+      error: safeError(error),
     });
   }
 });

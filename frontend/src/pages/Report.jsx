@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp, rp, fd, left, st } from '../context/AppContext';
+import { getPropertyPayments } from '../api/payments';
 import Header from '../components/Header';
 import { Card, Chip } from '../components/UIComponents';
+import { SkeletonLoader, ErrorState } from '../components/StateComponents';
 
 const MN = [
   'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
@@ -13,21 +15,91 @@ const mlabel = (k) => {
   return `${MN[parseInt(month, 10) - 1]} ${year}`;
 };
 
-const MONTH_OPTIONS = ['2026-10', '2026-09', '2026-08', '2026-07', '2026-06', '2026-05'];
-const YEAR_OPTIONS = ['2026', '2025'];
+// Buat MONTH_OPTIONS dinamis: 12 bulan ke belakang termasuk bulan ini
+function buildMonthOptions() {
+  const opts = [];
+  const now = new Date();
+  for (let i = 0; i < 12; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    opts.push(`${y}-${m}`);
+  }
+  return opts;
+}
+
+// Buat YEAR_OPTIONS dinamis: tahun ini dan tahun lalu
+function buildYearOptions() {
+  const y = new Date().getFullYear();
+  return [String(y), String(y - 1)];
+}
+
+const MONTH_OPTIONS = buildMonthOptions();
+const YEAR_OPTIONS = buildYearOptions();
+
+// Tanggal hari ini dalam format YYYY-MM-DD untuk default rentang
+function todayStr() {
+  const d = new Date();
+  return d.toISOString().slice(0, 10);
+}
+
+// Tanggal pertama bulan ini
+function firstOfMonth() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`;
+}
 
 export default function Report() {
-  const { bills, tenants } = useApp();
+  const { bills, tenants, activePropertyId } = useApp();
 
   const [mode, setMode] = useState('bulan'); // 'bulan' | 'tahun' | 'rentang'
-  const [selectedMonth, setSelectedMonth] = useState('2026-10');
-  const [selectedYear, setSelectedYear] = useState('2026');
-  const [startDate, setStartDate] = useState('2026-10-01');
-  const [endDate, setEndDate] = useState('2026-10-31');
+  const [selectedMonth, setSelectedMonth] = useState(MONTH_OPTIONS[0]);
+  const [selectedYear, setSelectedYear] = useState(YEAR_OPTIONS[0]);
+  const [startDate, setStartDate] = useState(firstOfMonth());
+  const [endDate, setEndDate] = useState(todayStr());
 
+  // Payments dari API
+  const [payments, setPayments] = useState([]);
+  const [paymentsLoading, setPaymentsLoading] = useState(false);
+  const [paymentsError, setPaymentsError] = useState('');
+
+  // Fetch semua payments dari API ketika activePropertyId berubah
+  useEffect(() => {
+    if (!activePropertyId) {
+      setPayments([]);
+      return;
+    }
+    fetchPayments();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activePropertyId]);
+
+  const fetchPayments = async () => {
+    if (!activePropertyId) return;
+    setPaymentsLoading(true);
+    setPaymentsError('');
+    try {
+      const response = await getPropertyPayments(activePropertyId);
+      if (response && response.success) {
+        setPayments(response.data || []);
+      } else {
+        setPayments([]);
+      }
+    } catch (err) {
+      console.error('Gagal mengambil data pembayaran untuk laporan:', err);
+      setPaymentsError('Gagal memuat data pembayaran.');
+      setPayments([]);
+    } finally {
+      setPaymentsLoading(false);
+    }
+  };
+
+  // ---- Fungsi bantu range tanggal ----
   const getDateRange = () => {
     if (mode === 'bulan') {
-      return [`${selectedMonth}-01`, `${selectedMonth}-31`];
+      // Hari terakhir bulan — ambil hari pertama bulan berikutnya, mundur 1 hari
+      const [y, m] = selectedMonth.split('-').map(Number);
+      const lastDay = new Date(y, m, 0).getDate(); // getDate() dari hari ke-0 bulan berikutnya = hari terakhir bulan ini
+      return [`${selectedMonth}-01`, `${selectedMonth}-${String(lastDay).padStart(2, '0')}`];
     }
     if (mode === 'tahun') {
       return [`${selectedYear}-01-01`, `${selectedYear}-12-31`];
@@ -38,21 +110,29 @@ export default function Report() {
   const [from, to] = getDateRange();
   const isDateInvalid = mode === 'rentang' && startDate > endDate;
 
-  // Filter bills by due date in range
-  const filteredBills = bills.filter((b) => !isDateInvalid && b.due >= from && b.due <= to);
+  // ---- Filter bills berdasarkan range tanggal (menggunakan dueDate/b.due) ----
+  const filteredBills = bills.filter(
+    (b) => !isDateInvalid && b.due >= from && b.due <= to
+  );
 
-  // Payments related to these bills
-  const transactions = filteredBills
-    .flatMap((b) => (b.pay || []).map((p) => ({ ...p, b })))
-    .sort((x, y) => y.d.localeCompare(x.d));
+  // ---- Filter payments dari API berdasarkan range tanggal (menggunakan paymentDate) ----
+  // payments dari API memiliki field paymentDate (ISO string)
+  const filteredPayments = payments.filter((p) => {
+    if (isDateInvalid) return false;
+    const d = (p.paymentDate || '').slice(0, 10);
+    return d >= from && d <= to;
+  });
 
-  const totalBillAmount = filteredBills.reduce((acc, b) => acc + b.amt, 0);
-  const totalPaidAmount = transactions.reduce((acc, p) => acc + p.amt, 0);
+  // ---- Kalkulasi summary dari bills yang difilter ----
+  const totalBillAmount = filteredBills.reduce((acc, b) => acc + (b.amount || b.amt || 0), 0);
   const totalUnpaidAmount = filteredBills.reduce((acc, b) => acc + left(b), 0);
-
-  const activeTenantsCount = tenants.filter((t) => t.st === 'Aktif').length;
   const lunasCount = filteredBills.filter((b) => st(b) === 'LUNAS').length;
   const belumLunasCount = filteredBills.filter((b) => st(b) !== 'LUNAS').length;
+
+  // ---- Kalkulasi total dari payments yang difilter (dari API) ----
+  const totalPaidAmount = filteredPayments.reduce((acc, p) => acc + (p.amount || p.amt || 0), 0);
+
+  const activeTenantsCount = tenants.filter((t) => t.st === 'Aktif').length;
 
   return (
     <div>
@@ -138,64 +218,86 @@ export default function Report() {
           </div>
         )}
 
+        {/* Loading / Error state payments */}
+        {paymentsLoading && (
+          <div className="mt-3">
+            <SkeletonLoader />
+          </div>
+        )}
+        {!paymentsLoading && paymentsError && (
+          <div className="mt-3">
+            <ErrorState message={paymentsError} onRetry={fetchPayments} />
+          </div>
+        )}
+
         {/* 4 Stat Cards */}
-        <div className="grid grid-cols-2 gap-[10px] mt-3">
-          <Card flat>
-            <div className="text-[13px] text-mute">Total tagihan</div>
-            <div className="font-bold text-[18px] text-ink">{rp(totalBillAmount)}</div>
-          </Card>
-          <Card flat>
-            <div className="text-[13px] text-mute">Sudah dibayar</div>
-            <div className="font-bold text-[18px] text-ok">{rp(totalPaidAmount)}</div>
-          </Card>
-          <Card flat>
-            <div className="text-[13px] text-mute">Belum dibayar</div>
-            <div className={`font-bold text-[18px] ${totalUnpaidAmount > 0 ? 'text-bad' : 'text-ok'}`}>
-              {rp(totalUnpaidAmount)}
-            </div>
-          </Card>
-          <Card flat>
-            <div className="text-[13px] text-mute">Transaksi</div>
-            <div className="font-bold text-[18px] text-ink">{transactions.length}</div>
-          </Card>
-        </div>
-
-        {/* Rincian Hunian & Status Tagihan */}
-        <Card flat className="mt-[10px] space-y-0 divide-y divide-line">
-          <div className="flex justify-between py-[10px]">
-            <span className="text-mute">Penghuni aktif</span>
-            <span className="font-semibold text-ink">{activeTenantsCount}</span>
-          </div>
-          <div className="flex justify-between py-[10px]">
-            <span className="text-mute">Tagihan lunas</span>
-            <span className="font-semibold text-ink">{lunasCount}</span>
-          </div>
-          <div className="flex justify-between py-[10px]">
-            <span className="text-mute">Tagihan belum lunas</span>
-            <span className="font-semibold text-ink">{belumLunasCount}</span>
-          </div>
-        </Card>
-
-        {/* Riwayat Transaksi */}
-        <h2 className="text-[13px] font-bold text-mute mt-[22px] mb-[8px]">
-          Daftar transaksi
-        </h2>
-        {transactions.length === 0 ? (
-          <p className="text-mute text-sm py-4">Belum ada transaksi di periode ini.</p>
-        ) : (
-          transactions.map((p, idx) => (
-            <Card key={`${p.b.id}-${idx}`} flat>
-              <div className="flex justify-between items-center">
-                <div>
-                  <div className="font-bold text-ink">Kamar {p.b.room}</div>
-                  <div className="text-[13px] text-mute">
-                    {fd(p.d)} · {p.m}
-                  </div>
+        {!paymentsLoading && (
+          <>
+            <div className="grid grid-cols-2 gap-[10px] mt-3">
+              <Card flat>
+                <div className="text-[13px] text-mute">Total tagihan</div>
+                <div className="font-bold text-[18px] text-ink">{rp(totalBillAmount)}</div>
+              </Card>
+              <Card flat>
+                <div className="text-[13px] text-mute">Sudah dibayar</div>
+                <div className="font-bold text-[18px] text-ok">{rp(totalPaidAmount)}</div>
+              </Card>
+              <Card flat>
+                <div className="text-[13px] text-mute">Belum dibayar</div>
+                <div className={`font-bold text-[18px] ${totalUnpaidAmount > 0 ? 'text-bad' : 'text-ok'}`}>
+                  {rp(totalUnpaidAmount)}
                 </div>
-                <div className="font-bold text-ink flex-shrink-0">{rp(p.amt)}</div>
+              </Card>
+              <Card flat>
+                <div className="text-[13px] text-mute">Transaksi</div>
+                <div className="font-bold text-[18px] text-ink">{filteredPayments.length}</div>
+              </Card>
+            </div>
+
+            {/* Rincian Hunian & Status Tagihan */}
+            <Card flat className="mt-[10px] space-y-0 divide-y divide-line">
+              <div className="flex justify-between py-[10px]">
+                <span className="text-mute">Penghuni aktif</span>
+                <span className="font-semibold text-ink">{activeTenantsCount}</span>
+              </div>
+              <div className="flex justify-between py-[10px]">
+                <span className="text-mute">Tagihan lunas</span>
+                <span className="font-semibold text-ink">{lunasCount}</span>
+              </div>
+              <div className="flex justify-between py-[10px]">
+                <span className="text-mute">Tagihan belum lunas</span>
+                <span className="font-semibold text-ink">{belumLunasCount}</span>
               </div>
             </Card>
-          ))
+
+            {/* Riwayat Transaksi — dari API payments */}
+            <h2 className="text-[13px] font-bold text-mute mt-[22px] mb-[8px]">
+              Daftar transaksi
+            </h2>
+            {filteredPayments.length === 0 ? (
+              <p className="text-mute text-sm py-4">Belum ada transaksi di periode ini.</p>
+            ) : (
+              filteredPayments
+                .slice()
+                .sort((a, b) => (b.paymentDate || '').localeCompare(a.paymentDate || ''))
+                .map((p) => (
+                  <Card key={p.id} flat>
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <div className="font-bold text-ink">
+                          {p.roomNumber ? `Kamar ${p.roomNumber}` : 'Pembayaran'}
+                        </div>
+                        <div className="text-[13px] text-mute">
+                          {fd(p.paymentDate)} · {p.method}
+                          {p.notes ? ` · ${p.notes}` : ''}
+                        </div>
+                      </div>
+                      <div className="font-bold text-ink flex-shrink-0">{rp(p.amount || p.amt)}</div>
+                    </div>
+                  </Card>
+                ))
+            )}
+          </>
         )}
       </div>
     </div>
