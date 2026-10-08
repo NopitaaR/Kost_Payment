@@ -117,7 +117,7 @@ export default function RoomForm() {
           <form onSubmit={handleSave}>
             <div className="mb-[14px]">
               <label className="block text-[13px] font-semibold mb-[6px] text-ink">
-                Nomor kamar
+                Nomor kamar <span className="text-bad">*</span>
               </label>
               <input
                 className="w-full border border-line bg-card rounded-[12px] p-[12px_14px] outline-none focus:outline-2 focus:outline-brand"
@@ -129,7 +129,7 @@ export default function RoomForm() {
 
             <div className="mb-[14px]">
               <label className="block text-[13px] font-semibold mb-[6px] text-ink">
-                Harga kamar / bulan
+                Harga kamar / bulan <span className="text-bad">*</span>
               </label>
               <input
                 type="text"
@@ -160,6 +160,14 @@ export default function RoomForm() {
 
             <Button type="submit" disabled={submitting}>
               {submitting ? 'Menyimpan…' : 'Simpan Kamar'}
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              disabled={submitting}
+              onClick={() => navigate(-1)}
+            >
+              Batal
             </Button>
           </form>
         )}

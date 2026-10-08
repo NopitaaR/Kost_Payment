@@ -191,6 +191,14 @@ export default function PaymentForm() {
           <Button type="submit" disabled={loading}>
             {loading ? 'Menyimpan...' : 'Simpan Pembayaran'}
           </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            disabled={loading}
+            onClick={() => navigate(-1)}
+          >
+            Batal
+          </Button>
         </form>
       </div>
     </div>

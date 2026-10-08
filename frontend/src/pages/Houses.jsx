@@ -6,7 +6,7 @@ import { SkeletonLoader, ErrorState, EmptyState } from '../components/StateCompo
 
 export default function Houses() {
   const navigate = useNavigate();
-  const { setActivePropertyId } = useApp();
+  const { setActivePropertyId, logout, confirmDialog } = useApp();
 
   const [properties, setProperties] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -34,10 +34,32 @@ export default function Houses() {
     navigate('/');
   };
 
+  const handleLogout = () => {
+    confirmDialog(
+      'Keluar dari aplikasi?',
+      'Kamu perlu login lagi untuk membuka data kost.',
+      'Ya, keluar',
+      () => {
+        logout();
+        navigate('/login');
+      }
+    );
+  };
+
   return (
     <div className="px-[18px] pt-[28px]">
-      <h1 className="text-[26px] font-extrabold m-0 text-ink">Selamat datang 👋</h1>
-      <p className="text-mute mb-[14px]">Pilih rumah kost</p>
+      <div className="flex justify-between items-start mb-[14px]">
+        <div>
+          <h1 className="text-[26px] font-extrabold m-0 text-ink">Selamat datang 👋</h1>
+          <p className="text-mute mt-1 mb-0">Pilih rumah kost</p>
+        </div>
+        <button
+          onClick={handleLogout}
+          className="border border-line bg-card rounded-[12px] px-[14px] py-[8px] font-bold text-bad text-[13px] cursor-pointer hover:bg-bad-soft transition-colors"
+        >
+          Keluar
+        </button>
+      </div>
 
       {loading && <SkeletonLoader />}
 

@@ -50,7 +50,7 @@ export default function Profile() {
         <form onSubmit={handleSave}>
           <div className="mb-[14px]">
             <label className="block text-[13px] font-semibold mb-[6px] text-ink">
-              Nama
+              Nama <span className="text-bad">*</span>
             </label>
             <input
               type="text"
@@ -62,7 +62,7 @@ export default function Profile() {
 
           <div className="mb-[14px]">
             <label className="block text-[13px] font-semibold mb-[6px] text-ink">
-              Email / Username
+              Email / Username <span className="text-bad">*</span>
             </label>
             <input
               type="text"

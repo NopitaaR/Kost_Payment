@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp, isUUID } from '../context/AppContext';
 import Header from '../components/Header';
-import { Card, Badge, Chip, FAB, Avatar } from '../components/UIComponents';
+import { Card, Badge, Chip, FAB, Avatar, Button } from '../components/UIComponents';
 import { SkeletonLoader, ErrorState, EmptyState } from '../components/StateComponents';
 import { getTenants } from '../api/tenants';
 
@@ -79,11 +79,18 @@ export default function Tenants() {
         {!loading && !error && tenants.length === 0 && !query && (
           <EmptyState
             icon="👥"
-            title="Belum ada penghuni"
+            title={filter === 'Aktif' ? 'Belum ada penghuni aktif' : 'Belum ada penghuni'}
             message={
               filter === 'Aktif'
-                ? 'Tambahkan penghuni baru untuk mulai mengelola kost.'
+                ? 'Tambahkan penghuni melalui menu Kamar.'
                 : 'Belum ada penghuni yang keluar.'
+            }
+            actionButton={
+              filter === 'Aktif' ? (
+                <Button onClick={() => navigate('/kamar')}>
+                  Pilih Kamar untuk Tambah Penghuni
+                </Button>
+              ) : null
             }
           />
         )}
@@ -99,12 +106,12 @@ export default function Tenants() {
 
                 return (
                   <Card key={x.id} onClick={() => navigate(`/penghuni/${x.id}`)}>
-                    <div className="flex justify-between items-center">
-                      <div className="flex gap-[10px] items-center">
+                    <div className="flex justify-between items-center gap-2">
+                      <div className="flex gap-[10px] items-center min-w-0 flex-1">
                         <Avatar name={x.name} />
-                        <div>
-                          <div className="font-bold text-ink">{(x.name || '').split(' ')[0]}</div>
-                          <div className="text-[13px] text-ink font-semibold">
+                        <div className="min-w-0 flex-1">
+                          <div className="font-bold text-ink truncate">{x.name || ''}</div>
+                          <div className="text-[13px] text-ink font-semibold truncate">
                             {roomText}
                           </div>
                           <div className="text-[13px] text-mute">{x.phone}</div>
